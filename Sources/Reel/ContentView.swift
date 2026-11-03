@@ -130,6 +130,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .reelShowSubscriptions)) { _ in
             section = .subscriptions
         }
+        .onReceive(NotificationCenter.default.publisher(for: .reelPreviewLink)) { note in
+            guard let sent = note.object as? String else { return }
+            section = .downloads
+            link = sent
+            lookUp()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .reelDownloadClipboard)) { _ in
             if let copied = Clipboard.readLink() {
                 section = .downloads

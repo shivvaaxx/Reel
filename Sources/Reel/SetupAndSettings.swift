@@ -105,6 +105,8 @@ private struct GeneralSettings: View {
     @AppStorage("showInDock") private var showInDock = true
     @AppStorage("showInMenuBar") private var showInMenuBar = true
     @AppStorage("resumeOnLaunch") private var resumeOnLaunch = true
+    @AppStorage("handoffStartsImmediately") private var handoffStartsImmediately = true
+    @State private var copiedBookmarklet = false
 
     var body: some View {
         Form {
@@ -148,6 +150,28 @@ private struct GeneralSettings: View {
             Toggle(isOn: $resumeOnLaunch) {
                 Text("Continue unfinished downloads when Reel opens")
                 Text("Downloads interrupted by quitting pick up where they left off.")
+            }
+
+            Section {
+                Toggle(isOn: $handoffStartsImmediately) {
+                    Text("Start links sent from other apps right away")
+                    Text("Applies to the Services menu, the Share menu, the Safari button and the bookmarklet. Off: they open in Reel for a preview first.")
+                }
+                LabeledContent {
+                    Button(copiedBookmarklet ? "Copied" : "Copy Bookmarklet") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(Handoff.bookmarklet, forType: .string)
+                        copiedBookmarklet = true
+                    }
+                } label: {
+                    Text("Bookmarklet for any browser")
+                    Text("Make a bookmark, paste this as its address, and click it on any video page to send it to Reel.")
+                }
+            } header: {
+                Text("From Other Apps")
+            } footer: {
+                Text("Select a link in any app and choose Services › Download with Reel.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -110,6 +110,12 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
     var isPanelShown: Bool { panel?.isVisible ?? false }
 
+    /// Brief checkmark on the icon: a link from another app was accepted.
+    func flashAccepted() {
+        acceptedUntil = Date().addingTimeInterval(1.2)
+        refreshIcon()
+    }
+
     @objc private func togglePanel() {
         if isPanelShown {
             hidePanel()
