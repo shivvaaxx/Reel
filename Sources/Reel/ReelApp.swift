@@ -197,11 +197,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             let quality = value(after: "--quality").flatMap(Quality.init(argument:))
             let clip = value(after: "--clip").flatMap(Handoff.parseClip)
+            // --folder <path> saves these downloads somewhere other than the download folder.
+            let folder = value(after: "--folder").map {
+                URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
+            }
             if let flag = args.firstIndex(of: "--download") {
                 for link in args[(flag + 1)...] where link.hasPrefix("http") {
-                    if quality != nil || clip != nil {
+                    if quality != nil || clip != nil || folder != nil {
                         Shared.queue.enqueue(link: link, title: Prefs.siteName(for: link) + " link", thumbnail: nil,
-                                             quality: quality ?? Prefs.defaultQuality, clip: clip)
+                                             quality: quality ?? Prefs.defaultQuality, clip: clip, folder: folder)
                     } else {
                         Shared.queue.quickAdd(link)
                     }

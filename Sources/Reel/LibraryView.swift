@@ -8,6 +8,7 @@ struct LibraryView: View {
     @State private var search = ""
     @State private var site = "All"
     @State private var selection: Set<LibraryItem.ID> = []
+    @State private var trashError: String?
 
     private var sites: [String] {
         ["All"] + Array(Set(library.items.map(\.site))).sorted()
@@ -34,7 +35,7 @@ struct LibraryView: View {
             } else {
                 List(selection: $selection) {
                     ForEach(filtered) { item in
-                        LibraryRow(item: item)
+                        LibraryRow(item: item) { trash([item.id]) }
                             .tag(item.id)
                             .contextMenu { menu(for: item) }
                     }
@@ -49,6 +50,11 @@ struct LibraryView: View {
             }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search Library")
+        .alert("Couldn't Move to Trash", isPresented: Binding(get: { trashError != nil }, set: { if !$0 { trashError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(trashError ?? "")
+        }
         .safeAreaInset(edge: .top) {
             if library.items.count > 0 {
                 HStack {
@@ -99,15 +105,28 @@ struct LibraryView: View {
             NotificationCenter.default.post(name: .reelFocusLink, object: nil)
         }
         Divider()
-        Button("Remove from Library", role: .destructive) {
+        Button("Move to Trash", role: .destructive) {
+            trash(selection.contains(item.id) ? selection : [item.id])
+        }
+        .disabled(!item.isAvailable)
+        Button("Remove from Library") {
             let ids = selection.contains(item.id) ? selection : [item.id]
             library.remove(ids)
+        }
+    }
+
+    private func trash(_ ids: Set<LibraryItem.ID>) {
+        let failed = library.trash(ids)
+        selection.subtract(ids)
+        if !failed.isEmpty {
+            trashError = "Reel couldn't move \(failed.joined(separator: ", ")) to the Trash. It may be open in another app, or in a folder you can't change."
         }
     }
 }
 
 private struct LibraryRow: View {
     let item: LibraryItem
+    let trash: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -140,6 +159,18 @@ private struct LibraryRow: View {
                 }
             }
             Spacer()
+            if item.isAvailable {
+                HStack(spacing: 4) {
+                    Button("Show in Finder", systemImage: "magnifyingglass") { item.reveal() }
+                        .help("Show in Finder")
+                    Button("Move to Trash", systemImage: "trash", action: trash)
+                        .help("Move to Trash")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .imageScale(.large)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
         .contentShape(.rect)
