@@ -4,16 +4,22 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+### Added
+- **A folder menu on every subscription**, so one can save to Downloads and another to iCloud Drive. The menu at the top sets the default for subscriptions you haven't changed.
+- **Earlier downloads join the Library.** When Reel checks a subscription's folder, videos it finds there (by "Where from", embedded details, video ID or matching title, so downloads from other apps count too) are added to the Library and not downloaded again.
+- **Show in Finder and Move to Trash buttons** on every Library item, so you never have to hunt for a file. Moving to the Trash also removes it from the Library.
+- Launch option `--folder <path>` saves downloads to a chosen folder.
+
+### Changed
+- Subscription folders in iCloud Drive are checked without downloading iCloud-only videos back to this Mac, and busy folders like Downloads are no longer re-read in full on every check.
+- Downloading a video into the same folder again replaces its earlier Library entry.
+
 ## [1.2.0] - 2026-11-04
 
 ### Added
 - **What's New** after each update: the first time you open a new version, Reel shows what changed (also in Help › What's New in Reel).
-- **A folder for each subscription.** Every subscription has its own folder menu, so one can save to Downloads and another to iCloud Drive. The menu at the top sets the default for subscriptions you haven't changed. Before downloading, Reel checks that folder, including videos you moved there yourself, so nothing is downloaded twice.
+- **A folder for each subscription.** Choose where a channel or playlist saves. Before downloading, Reel checks that folder, including videos you moved there yourself, so nothing is downloaded twice.
 - **Download Existing** for subscriptions: grab the videos that were already in a channel or playlist when you subscribed. When subscribing you can also choose "Plus everything already there".
-- Subscription folders can be in iCloud Drive: videos stored only in iCloud are recognised without downloading them back to this Mac.
-- **Earlier downloads join the Library.** When Reel checks a subscription's folder, videos it finds there (by "Where from", embedded details, video ID or matching title, so downloads from other apps count too) are added to the Library and not downloaded again.
-- **Show in Finder and Move to Trash buttons** on every Library item, so you never have to hunt for a file. Moving to the Trash also removes it from the Library.
-- Launch option `--folder <path>` saves downloads to a chosen folder.
 - Downloaded files remember where they came from (Finder's "Where from"), even after you move or rename them.
 
 ### Changed
