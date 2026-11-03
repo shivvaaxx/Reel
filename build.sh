@@ -23,7 +23,23 @@ if [[ ! -f build/AppIcon.icns ]]; then
   iconutil -c icns build/AppIcon.iconset -o build/AppIcon.icns
 fi
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-if [[ -f Resources/Assets.car ]]; then cp Resources/Assets.car "$APP/Contents/Resources/"; fi
+
+# macOS 26 icon with light, dark (black arrow) and tinted variants. Resources/AppIcon.icon
+# is an Icon Composer document (open it in Icon Composer to tweak); actool compiles it into
+# Assets.car. The .icns above stays as the fallback for Finder previews and older tools.
+if [[ ! -d Resources/AppIcon.icon ]]; then
+  swift tools/MakeIcon.swift --icon-composer Resources/AppIcon.icon
+fi
+if xcrun --find actool >/dev/null 2>&1; then
+  rm -rf build/assets && mkdir -p build/assets
+  xcrun actool Resources/AppIcon.icon --compile build/assets --platform macosx \
+    --minimum-deployment-target 26.0 --app-icon AppIcon \
+    --output-partial-info-plist build/assets/partial.plist >/dev/null
+  cp build/assets/Assets.car "$APP/Contents/Resources/Assets.car"
+  [[ -f build/assets/AppIcon.icns ]] && cp build/assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string AppIcon" "$APP/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :CFBundleIconName AppIcon" "$APP/Contents/Info.plist"
+fi
 
 # Sparkle. Reel isn't sandboxed, so Sparkle's XPC services aren't needed.
 FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
@@ -62,9 +78,20 @@ else
   echo "Skipping app extensions (needs Xcode and a signing certificate)."
 fi
 
+# Developer ID builds get the hardened runtime and a secure timestamp, which Apple's
+# notarization requires (make-dmg.sh then notarizes). Other builds skip both.
+if [[ "$IDENTITY" != "-" ]] && security find-identity -v -p codesigning | grep "$IDENTITY" | grep -q "Developer ID Application"; then
+  SIGN_FLAGS=(--options runtime --timestamp)
+  for appex in "$APP"/Contents/PlugIns/*.appex(N) "$APP"/Contents/Extensions/*.appex(N); do
+    codesign --force "${SIGN_FLAGS[@]}" --preserve-metadata=entitlements --sign "$IDENTITY" "$appex"
+  done
+else
+  SIGN_FLAGS=(--timestamp=none)
+fi
+
 # Inside out: Sparkle's helpers, the framework, then the app. Extensions keep the
-# signatures (and sandbox entitlements) Xcode gave them.
-sign() { codesign --force --timestamp=none --sign "$IDENTITY" "$@"; }
+# sandbox entitlements Xcode gave them.
+sign() { codesign --force "${SIGN_FLAGS[@]}" --sign "$IDENTITY" "$@"; }
 sign "$FRAMEWORK/Versions/B/Autoupdate"
 sign "$FRAMEWORK/Versions/B/Updater.app"
 sign "$FRAMEWORK"

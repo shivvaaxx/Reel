@@ -4,6 +4,11 @@
 // continuous-corner body on a 1024 pt canvas).
 //
 // Usage: swift tools/MakeIcon.swift <out.iconset> [preview.png]
+//        swift tools/MakeIcon.swift --icon-composer <out.icon>
+//
+// The second form writes an Icon Composer document for macOS 26 (compiled by actool
+// into Assets.car). It carries the appearance variants: a white arrow normally, a
+// black arrow in dark mode, and a tintable arrow for tinted icons.
 
 import AppKit
 import SwiftUI
@@ -133,9 +138,86 @@ func writePNG(_ image: CGImage, to url: URL) throws {
     try data.write(to: url)
 }
 
+// MARK: - Icon Composer document
+
+/// The full-bleed gradient background (the system applies the icon shape and edges).
+func renderBackground(pixels: Int) -> CGImage {
+    let size = CGFloat(pixels)
+    let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    let unit = size / designTile.width
+    ctx.translateBy(x: 0, y: size)
+    ctx.scaleBy(x: unit, y: -unit)
+    ctx.translateBy(x: -designTile.minX, y: -designTile.minY)
+    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+                              colors: [hex(0xFC7989), hex(0xD449D7), hex(0x8044ED), hex(0x4731B9)] as CFArray,
+                              locations: [0, 0.38, 0.72, 1])!
+    ctx.drawLinearGradient(gradient, start: CGPoint(x: 62.0183, y: 93.8558), end: CGPoint(x: 403.135, y: 389.49),
+                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    return ctx.makeImage()!
+}
+
+/// The arrow as SVG on the tile's full canvas, so it lands exactly where the design puts it.
+let arrowSVG = """
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="32 32 448 448">
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#FFFFFF" d="M220 128H292C305.255 128 316 138.745 316 152V252H354C368.255 252 375.394 269.235 365.314 279.314L271.556 373.071C262.965 381.663 249.035 381.663 240.444 373.071L146.686 279.314C136.606 269.235 143.745 252 158 252H196V152C196 138.745 206.745 128 220 128ZM240 166C236.667 164.075 232.5 166.481 232.5 170.33V222.67C232.5 226.519 236.667 228.925 240 227L285.33 200.83C288.663 198.906 288.663 194.094 285.33 192.17L240 166Z"/>
+</svg>
+
+"""
+
+let iconJSON = """
+{
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            { "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } },
+            { "appearance" : "dark", "value" : { "solid" : "srgb:0.00000,0.00000,0.00000,1.00000" } }
+          ],
+          "glass" : true,
+          "image-name" : "arrow.svg",
+          "name" : "arrow"
+        }
+      ],
+      "shadow" : { "kind" : "layer-color", "opacity" : 0.5 },
+      "translucency" : { "enabled" : false, "value" : 0 }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "background.png",
+          "name" : "background"
+        }
+      ],
+      "shadow" : { "kind" : "none", "opacity" : 0 },
+      "translucency" : { "enabled" : false, "value" : 0 }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [ "macOS" ]
+  }
+}
+
+"""
+
 let args = CommandLine.arguments
+if args.count >= 3, args[1] == "--icon-composer" {
+    let doc = URL(fileURLWithPath: args[2])
+    let assets = doc.appendingPathComponent("Assets")
+    try? FileManager.default.removeItem(at: doc)
+    try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+    try writePNG(renderBackground(pixels: 1024), to: assets.appendingPathComponent("background.png"))
+    try arrowSVG.write(to: assets.appendingPathComponent("arrow.svg"), atomically: true, encoding: .utf8)
+    try iconJSON.write(to: doc.appendingPathComponent("icon.json"), atomically: true, encoding: .utf8)
+    print("Wrote \(doc.path)")
+    exit(0)
+}
 guard args.count >= 2 else {
     print("Usage: swift tools/MakeIcon.swift <out.iconset> [preview.png]")
+    print("       swift tools/MakeIcon.swift --icon-composer <out.icon>")
     exit(1)
 }
 let iconset = URL(fileURLWithPath: args[1])
