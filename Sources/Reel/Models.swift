@@ -49,8 +49,22 @@ struct DownloadOptions {
     /// Optional section of the video to download, in seconds.
     var clipStart: Double? = nil
     var clipEnd: Double? = nil
+    /// Above 1080p in compatible mode: download the real 4K and convert it to HEVC.
+    var convertHighResToHEVC: Bool = true
+    /// Maximum speed in MB/s; nil = unlimited.
+    var rateLimit: Double? = nil
 
     var isClip: Bool { clipStart != nil || clipEnd != nil }
+
+    private var isHighRes: Bool { [.best, .p2160, .p1440].contains(quality) }
+
+    /// Whether this download takes the "real 4K, then convert to HEVC" path.
+    func usesHEVCConversion(for link: String) -> Bool {
+        compatible && convertHighResToHEVC && isHighRes && Prefs.site(for: link) != .tiktok
+    }
+
+    /// Segmented (multi-connection) fetching can't respect a speed limit or cut clips.
+    var canAccelerate: Bool { connections > 1 && !isClip && rateLimit == nil }
 
     static func current(quality: Quality) -> DownloadOptions {
         let d = UserDefaults.standard
@@ -62,7 +76,9 @@ struct DownloadOptions {
             embedDetails: d.object(forKey: "embedDetails") as? Bool ?? true,
             subtitles: d.bool(forKey: "subtitles"),
             subtitleLanguage: d.string(forKey: "subtitleLanguage") ?? "en",
-            connections: d.object(forKey: "connections") as? Int ?? 8
+            connections: d.object(forKey: "connections") as? Int ?? 8,
+            convertHighResToHEVC: d.object(forKey: "hevc4K") as? Bool ?? true,
+            rateLimit: d.bool(forKey: "limitRate") ? max(d.double(forKey: "rateLimitMB"), 0.1) : nil
         )
     }
 
@@ -79,9 +95,15 @@ struct DownloadOptions {
         default:
             break
         }
+        if let rateLimit { args += ["-r", Self.rate(rateLimit)] }
         args += Prefs.cookieArguments(for: link) + Prefs.proxyArguments
         args += ["--", link]
         return args
+    }
+
+    /// 2.5 MB/s → "2560K" (understood by both yt-dlp and gallery-dl).
+    static func rate(_ megabytesPerSecond: Double) -> String {
+        "\(Int((megabytesPerSecond * 1024).rounded()))K"
     }
 
     /// yt-dlp arguments for a full download. With `infoFile`, yt-dlp resumes from a plan the
@@ -97,8 +119,9 @@ struct DownloadOptions {
             "--print", "before_dl:@@N %(filename)s",
             "--print", "after_move:@@F %(filepath)s",
             // Streaming (HLS/DASH) formats fetch their fragments in parallel too.
-            "--concurrent-fragments", "\(max(1, connections))",
+            "--concurrent-fragments", "\(rateLimit == nil ? max(1, connections) : 1)",
         ]
+        if let rateLimit { args += ["--limit-rate", Self.rate(rateLimit)] }
         args += selectionArguments(for: link, includeCookies: false)
         if quality != .audio && subtitles {
             let lang = subtitleLanguage.trimmingCharacters(in: .whitespaces)
@@ -138,7 +161,12 @@ struct DownloadOptions {
             let cap = quality.maxHeight.map { "[height<=\($0)]" } ?? ""
             let softCap = quality.maxHeight.map { "[height<=?\($0)]" } ?? ""
             let wantsCompatible = compatible || Prefs.site(for: link) == .tiktok
-            if wantsCompatible {
+            if usesHEVCConversion(for: link) {
+                // Best real resolution first (often VP9/AV1 above 1080p); Reel converts it to
+                // HEVC afterwards. At equal resolution H.264 still wins, avoiding a conversion.
+                args += ["-f", "bv\(cap)+ba/b\(cap)/b",
+                         "-S", "res,fps,vcodec:h264,acodec:m4a", "--merge-output-format", "mp4"]
+            } else if wantsCompatible {
                 // Ask for H.264 explicitly. Instagram only offers VP9 as separate video (QuickTime
                 // can't play it) but has unlabelled H.264 progressive files, tried before VP9.
                 args += ["-f", [
@@ -152,7 +180,9 @@ struct DownloadOptions {
             } else {
                 args += ["-f", "bv\(cap)+ba/b\(cap)/b"]
             }
-            if wantsCompatible {
+            if usesHEVCConversion(for: link) {
+                // Format and sort set above.
+            } else if wantsCompatible {
                 // H.264 + AAC plays everywhere on Apple devices. TikTok also offers ByteDance's
                 // own codec, which nothing on a Mac can play, so it always gets this sort.
                 args += ["-S", "vcodec:h264,res,acodec:m4a", "--merge-output-format", "mp4"]
