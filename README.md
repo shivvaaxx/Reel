@@ -1,6 +1,19 @@
-# Reel
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.png">
+    <img src="docs/icon.png" width="180" height="180" alt="Reel app icon">
+  </picture>
+</p>
 
-**A clean, native Mac app for downloading videos and photos — from YouTube, Instagram, TikTok and over a thousand other sites.**
+<h1 align="center">Reel</h1>
+
+<p align="center">
+  <b>A clean, native Mac app for downloading videos and photos — from YouTube, Instagram, TikTok and over a thousand other sites.</b>
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>Download the latest version</b></a> · macOS 26 · Apple silicon · Free and open source
+</p>
 
 Reel is a SwiftUI app for macOS that puts a calm, Apple-style interface on top of the best open-source download tools: [yt-dlp](https://github.com/yt-dlp/yt-dlp) for video and [gallery-dl](https://github.com/mikf/gallery-dl) for photos. Paste a link, press Return, and you're done. It lives in your menu bar, your Share menu, Safari and Shortcuts too, so you can send a link to Reel from wherever you are and keep browsing.
 
@@ -173,6 +186,7 @@ swift test        # runs the test suite
 | `Extensions/` | Share, Safari and Shortcuts extensions |
 | `Resources/AppIcon.icon` | The app icon (light, dark and tinted), editable in Icon Composer |
 | `tools/MakeIcon.swift` | Renders the app icon |
+| `tools/MakeSocialPreview.swift` | Renders the repository's social preview image (`docs/social-preview.png`) |
 | `release.sh` | Builds, signs and publishes a release and its update feed |
 
 ## Support Reel
