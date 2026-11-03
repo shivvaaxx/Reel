@@ -55,21 +55,49 @@ enum FolderIndex {
     /// identified by, in order: its "Where from" stamp, the source link yt-dlp embeds in
     /// its metadata (read with ffprobe), or a YouTube ID in its name ("Title [dQw4w9WgXcQ].mp4").
     static func keys(in folder: URL, ffprobe: URL?, environment: [String: String]?) async -> Set<String> {
-        let files = mediaFiles(in: folder)
-        var keys = Set<String>()
-        for file in files {
+        Set(await scan(folder, ffprobe: ffprobe, environment: environment).compactMap(\.key))
+    }
+
+    /// A media file in a folder, and what it is if that could be worked out.
+    struct Found: Sendable {
+        let file: URL
+        /// The page it came from, when known (stamp or embedded metadata).
+        let link: String?
+        /// Its `LinkKey`, when known (from the link, or a YouTube ID in the name).
+        let key: String?
+
+        /// The file name without extension (or iCloud placeholder decoration).
+        var name: String {
+            URL(fileURLWithPath: FolderIndex.placeholderName(file.lastPathComponent) ?? file.lastPathComponent)
+                .deletingPathExtension().lastPathComponent
+        }
+    }
+
+    static func scan(_ folder: URL, ffprobe: URL?, environment: [String: String]?) async -> [Found] {
+        var found: [Found] = []
+        for file in mediaFiles(in: folder) {
             if let link = SourceTag.read(file) {
-                keys.insert(LinkKey.key(for: link))
+                found.append(Found(file: file, link: link, key: LinkKey.key(for: link)))
             } else if let ffprobe, !isCloudOnly(file), await !ProbeMemory.shared.knownUnlinked(file),
                       let link = await embeddedLink(of: file, ffprobe: ffprobe, environment: environment) {
-                keys.insert(LinkKey.key(for: link))
                 SourceTag.stamp(file, link: link)   // faster next time
-            } else if let id = youTubeID(inName: URL(fileURLWithPath: placeholderName(file.lastPathComponent)
-                                                    ?? file.lastPathComponent).deletingPathExtension().lastPathComponent) {
-                keys.insert("youtube:\(id)")
+                found.append(Found(file: file, link: link, key: LinkKey.key(for: link)))
+            } else {
+                let probe = Found(file: file, link: nil, key: nil)
+                found.append(Found(file: file, link: nil, key: youTubeID(inName: probe.name).map { "youtube:\($0)" }))
             }
         }
-        return keys
+        return found
+    }
+
+    /// Compares a file name with a video title the way yt-dlp names files: it swaps characters
+    /// that aren't allowed in names ("|" becomes "｜", "/" becomes "⧸"…), so only letters and
+    /// digits are compared, ignoring case, spacing and punctuation.
+    nonisolated static func titleKey(_ text: String) -> String {
+        let folded = text.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? text
+        return String(folded.lowercased().unicodeScalars
+            .filter { CharacterSet.alphanumerics.contains($0) }
+            .map(Character.init))
     }
 
     static func mediaFiles(in folder: URL) -> [URL] {

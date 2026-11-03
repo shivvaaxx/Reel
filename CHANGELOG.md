@@ -11,6 +11,7 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 - **A folder for each subscription.** Every subscription has its own folder menu, so one can save to Downloads and another to iCloud Drive. The menu at the top sets the default for subscriptions you haven't changed. Before downloading, Reel checks that folder, including videos you moved there yourself, so nothing is downloaded twice.
 - **Download Existing** for subscriptions: grab the videos that were already in a channel or playlist when you subscribed. When subscribing you can also choose "Plus everything already there".
 - Subscription folders can be in iCloud Drive: videos stored only in iCloud are recognised without downloading them back to this Mac.
+- **Earlier downloads join the Library.** When Reel checks a subscription's folder, videos it finds there (by "Where from", embedded details, video ID or matching title, so downloads from other apps count too) are added to the Library and not downloaded again.
 - Downloaded files remember where they came from (Finder's "Where from"), even after you move or rename them.
 
 ### Changed
