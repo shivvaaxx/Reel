@@ -102,7 +102,12 @@ final class Library {
         let files = job.kind == .gallery ? job.galleryFiles : [job.fileURL].compactMap { $0 }
         guard !files.isEmpty else { return }
         let key = LinkKey.key(for: job.link)
-        items.removeAll { $0.key == key && !$0.isAvailable }
+        // Downloading the same video into the same folder again replaces the earlier copy's entry.
+        let folders = Set(files.map { $0.deletingLastPathComponent().standardizedFileURL.path })
+        items.removeAll { item in
+            item.key == key && (!item.isAvailable
+                || item.fileURLs.contains { folders.contains($0.deletingLastPathComponent().standardizedFileURL.path) })
+        }
         items.insert(LibraryItem(
             id: job.id, key: key, link: job.link, title: job.title,
             site: Prefs.siteName(for: job.link),
@@ -139,6 +144,24 @@ final class Library {
     func remove(_ ids: Set<LibraryItem.ID>) {
         items.removeAll { ids.contains($0.id) }
         save()
+    }
+
+    /// Moves the items' files to the Trash and removes them from the Library. Returns the
+    /// titles whose files couldn't be moved (those stay in the Library).
+    @discardableResult
+    func trash(_ ids: Set<LibraryItem.ID>) -> [String] {
+        var failed: [String] = []
+        var done: Set<LibraryItem.ID> = []
+        for item in items where ids.contains(item.id) {
+            var ok = true
+            for file in item.existingFiles {
+                do { try FileManager.default.trashItem(at: file, resultingItemURL: nil) } catch { ok = false }
+            }
+            if ok { done.insert(item.id) } else { failed.append(item.title) }
+        }
+        items.removeAll { done.contains($0.id) }
+        save()
+        return failed
     }
 
     func removeMissing() {
