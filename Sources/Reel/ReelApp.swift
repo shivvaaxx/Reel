@@ -49,6 +49,7 @@ extension Notification.Name {
     static let reelFocusLink = Notification.Name("reelFocusLink")
     static let reelShowLibrary = Notification.Name("reelShowLibrary")
     static let reelShowSubscriptions = Notification.Name("reelShowSubscriptions")
+    static let reelPreviewLink = Notification.Name("reelPreviewLink")
 }
 
 /// Tags the main window so AppKit code (the menu bar panel) can find it.
@@ -151,6 +152,13 @@ struct ReelApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    private let serviceProvider = ServiceProvider()
+
+    /// reel:// links from the Safari extension, the bookmarklet or scripts.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated { urls.forEach(Handoff.handle) }
+    }
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Set before the first window appears so a hidden Dock icon never flashes.
         MainActor.assumeIsolated {
@@ -160,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+        NSApp.servicesProvider = serviceProvider
+        NSUpdateDynamicServices()
         MainActor.assumeIsolated {
             _ = Updater.shared   // starts Sparkle's scheduled checks
             Shared.applyPresence()
@@ -181,11 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
             }
             let quality = value(after: "--quality").flatMap(Quality.init(rawValue:))
-            let clip = value(after: "--clip").flatMap { text -> (Double?, Double?)? in
-                let parts = text.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
-                guard parts.count == 2 else { return nil }
-                return (TimeText.seconds(parts[0]), parts[1].isEmpty ? nil : TimeText.seconds(parts[1]))
-            }
+            let clip = value(after: "--clip").flatMap(Handoff.parseClip)
             if let flag = args.firstIndex(of: "--download") {
                 for link in args[(flag + 1)...] where link.hasPrefix("http") {
                     if quality != nil || clip != nil {
