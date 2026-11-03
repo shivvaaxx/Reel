@@ -7,6 +7,15 @@
     <language>en</language>
     <!-- release.sh adds new versions below this line -->
     <item>
+      <title>Reel 1.2.0</title>
+      <pubDate>Wed, 04 Nov 2026 06:33:00 +0800</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<h3>Added</h3><ul><li><b>What&#x27;s New</b> after each update: the first time you open a new version, Reel shows what changed (also in Help › What&#x27;s New in Reel).</li><li><b>A folder for each subscription.</b> Choose where a channel or playlist saves. Before downloading, Reel checks that folder, including videos you moved there yourself, so nothing is downloaded twice.</li><li><b>Download Existing</b> for subscriptions: grab the videos that were already in a channel or playlist when you subscribed. When subscribing you can also choose &quot;Plus everything already there&quot;.</li><li>Downloaded files remember where they came from (Finder&#x27;s &quot;Where from&quot;), even after you move or rename them.</li></ul><h3>Changed</h3><ul><li>Subscriptions explain what they&#x27;re doing: &quot;waiting for new videos&quot; instead of &quot;0 downloaded&quot;, and a note on what happens to videos already there.</li></ul><h3>Fixed</h3><ul><li>Subscribed playlists only looked at their first 30 videos, so videos added to the end of a long playlist were missed.</li></ul>]]></description>
+      <enclosure url="https://github.com/shivvaaxx/Reel/releases/download/v1.2.0/Reel-1.2.0.dmg" sparkle:edSignature="T3orgZ7JUVayrCtfkDTcemNfAyEjE53oFPPlXrjwtI2KQuIh0RzStFyj9BnfBgvhZTXGKT0sb6HI63TxE1GCAg==" length="4866164" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Reel 1.1.0</title>
       <pubDate>Wed, 04 Nov 2026 06:17:58 +0800</pubDate>
       <sparkle:version>15</sparkle:version>
