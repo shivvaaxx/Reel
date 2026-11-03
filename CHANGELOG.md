@@ -4,6 +4,18 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+### Added
+- **What's New** after each update: the first time you open a new version, Reel shows what changed (also in Help › What's New in Reel).
+- **A folder for each subscription.** Choose where a channel or playlist saves. Before downloading, Reel checks that folder, including videos you moved there yourself, so nothing is downloaded twice.
+- **Download Existing** for subscriptions: grab the videos that were already in a channel or playlist when you subscribed. When subscribing you can also choose "Plus everything already there".
+- Downloaded files remember where they came from (Finder's "Where from"), even after you move or rename them.
+
+### Changed
+- Subscriptions explain what they're doing: "waiting for new videos" instead of "0 downloaded", and a note on what happens to videos already there.
+
+### Fixed
+- Subscribed playlists only looked at their first 30 videos, so videos added to the end of a long playlist were missed.
+
 ## [1.1.0] - 2026-11-04
 
 ### Added

@@ -18,6 +18,14 @@ if [[ -f VERSION ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD 2>/dev/null || echo 1)" "$APP/Contents/Info.plist"
 fi
 
+# "What's New": this version's CHANGELOG section (or [Unreleased] for development builds),
+# shown once after an update.
+VERSION_NOTES=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+notes_for() { awk -v head="## [$1]" 'index($0, "## [") == 1 { if (p) exit; p = (index($0, head) == 1); next } p' CHANGELOG.md; }
+NOTES=$(notes_for "$VERSION_NOTES")
+if [[ -z "${NOTES//[[:space:]]/}" ]]; then NOTES=$(notes_for Unreleased); fi
+print -r -- "$NOTES" > "$APP/Contents/Resources/WhatsNew.md"
+
 if [[ ! -f build/AppIcon.icns ]]; then
   swift tools/MakeIcon.swift build/AppIcon.iconset
   iconutil -c icns build/AppIcon.iconset -o build/AppIcon.icns

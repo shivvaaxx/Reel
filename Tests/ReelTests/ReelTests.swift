@@ -205,3 +205,63 @@ struct QualityArgumentTests {
         #expect(Quality(argument: "potato") == nil)
     }
 }
+
+@Suite("What's New")
+struct WhatsNewTests {
+    @Test func parsesChangelogSections() {
+        let text = """
+
+        ### Added
+        - **Library** (⌘2): everything you've downloaded.
+        - Subscriptions.
+
+        ### Fixed
+        - A rare crash
+          at launch.
+        """
+        let sections = WhatsNew.parse(text)
+        #expect(sections.map(\.title) == ["Added", "Fixed"])
+        #expect(sections[0].items.count == 2)
+        #expect(String(sections[0].items[0].characters).hasPrefix("Library (⌘2)"))
+        #expect(String(sections[1].items[0].characters) == "A rare crash at launch.")
+    }
+
+    @Test func emptyNotesHaveNoSections() {
+        #expect(WhatsNew.parse("").isEmpty)
+    }
+}
+
+@Suite("Subscriptions")
+@MainActor
+struct SubscriptionWindowTests {
+    @Test func channelsReadNewestPlaylistsReadEverything() {
+        #expect(Subscriptions.lookupWindow(for: "https://www.youtube.com/@NASA/videos") == Subscriptions.window)
+        #expect(Subscriptions.lookupWindow(for: "https://www.youtube.com/channel/UC123/videos") == Subscriptions.window)
+        #expect(Subscriptions.lookupWindow(for: "https://youtube.com/playlist?list=PL123&si=abc") == nil)
+    }
+}
+
+@Suite("Folder index")
+struct FolderIndexTests {
+    @Test func youTubeIDsInFileNames() {
+        #expect(FolderIndex.youTubeID(inName: "Me at the zoo [jNQXAC9IVRw]") == "jNQXAC9IVRw")
+        #expect(FolderIndex.youTubeID(inName: "Me at the zoo") == nil)
+        #expect(FolderIndex.youTubeID(inName: "Notes [draft]") == nil)
+    }
+
+    @Test func stampedFilesAreRecognisedAfterMoving() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("reel-index-\(UUID().uuidString)")
+        let folder = root.appendingPathComponent("MasterChef/Season 1")
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let original = root.appendingPathComponent("Episode 1.mp4")
+        try Data("x".utf8).write(to: original)
+        SourceTag.stamp(original, link: "https://youtu.be/jNQXAC9IVRw?si=share")
+        let moved = folder.appendingPathComponent("Renamed.mp4")
+        try fm.moveItem(at: original, to: moved)
+        #expect(SourceTag.read(moved) == "https://youtu.be/jNQXAC9IVRw?si=share")
+        let keys = await FolderIndex.keys(in: root, ffprobe: nil, environment: nil)
+        #expect(keys == ["youtube:jNQXAC9IVRw"])
+    }
+}

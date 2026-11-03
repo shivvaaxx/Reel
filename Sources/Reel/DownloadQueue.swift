@@ -374,9 +374,22 @@ final class DownloadQueue {
 
     // MARK: Queueing
 
+    /// Whether this link is already in the list and not failed or cancelled.
+    func isQueued(_ link: String) -> Bool {
+        let key = LinkKey.key(for: link)
+        return jobs.contains { job in
+            guard LinkKey.key(for: job.link) == key else { return false }
+            switch job.status {
+            case .failed, .cancelled, .alreadyDownloaded: return false
+            default: return true
+            }
+        }
+    }
+
     func enqueue(link: String, title: String, thumbnail: URL?, quality: Quality, kind: DownloadKind = .video,
-                 clip: (start: Double?, end: Double?)? = nil) {
+                 clip: (start: Double?, end: Double?)? = nil, folder: URL? = nil) {
         var options = DownloadOptions.current(quality: quality)
+        if let folder { options.folder = folder }
         options.clipStart = clip?.start
         options.clipEnd = clip?.end
         let job = DownloadJob(link: link, kind: kind, title: title, thumbnail: thumbnail, options: options)
@@ -813,7 +826,11 @@ final class DownloadQueue {
                 let files = job.kind == .gallery ? job.galleryFiles : [job.fileURL].compactMap { $0 }
                 let sizes = files.compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize }
                 if !sizes.isEmpty { job.fileSize = Double(sizes.reduce(0, +)) }
-                if !job.options.isClip { library.record(job) }
+                if !job.options.isClip {
+                    library.record(job)
+                    // Lets Reel recognise the file wherever it's moved (see FolderIndex).
+                    files.forEach { SourceTag.stamp($0, link: job.link) }
+                }
                 Notifier.downloadFinished(job)
                 Task { [weak job] in
                     let notes = await Integrations.handOff(files)

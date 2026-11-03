@@ -11,6 +11,9 @@ struct SubscriptionsView: View {
     @State private var adding = false
     @State private var error: String?
     @State private var selection: Set<UUID> = []
+    @State private var notice: String?
+    /// nil = Reel's download folder.
+    @State private var folder: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,14 +23,16 @@ struct SubscriptionsView: View {
                 ContentUnavailableView {
                     Label("No Subscriptions", systemImage: "dot.radiowaves.left.and.right")
                 } description: {
-                    Text("Paste a YouTube channel or playlist link above. Reel will download new uploads as they appear.")
+                    Text("Paste a YouTube channel or playlist link above. Reel checks it regularly and downloads new videos as they appear.")
                 }
                 .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
                     Section {
                         ForEach(subscriptions.items) { sub in
-                            SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id))
+                            SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id)) {
+                                downloadExisting(sub)
+                            }
                                 .tag(sub.id)
                                 .contextMenu { menu(for: sub) }
                         }
@@ -83,9 +88,19 @@ struct SubscriptionsView: View {
                     Text("Plus the latest 1").tag(1)
                     Text("Plus the latest 5").tag(5)
                     Text("Plus the latest 10").tag(10)
+                    Divider()
+                    Text("Plus everything already there").tag(Subscriptions.everything)
                 }
                 .labelsHidden()
                 .fixedSize()
+                Menu {
+                    Button("Reel's Download Folder") { folder = nil }
+                    Button("Choose Folder…") { if let url = Self.chooseFolder() { folder = url } }
+                } label: {
+                    Label(folder?.lastPathComponent ?? Prefs.downloadFolder.lastPathComponent, systemImage: "folder")
+                }
+                .fixedSize()
+                .help("Where this subscription saves. Reel checks this folder for videos you already have.")
                 Spacer()
                 Button("Subscribe", systemImage: "plus", action: add)
                     .buttonStyle(.glassProminent)
@@ -95,6 +110,15 @@ struct SubscriptionsView: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .symbolRenderingMode(.multicolor)
                     .foregroundStyle(.secondary)
+            } else if let notice {
+                Label(notice, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(latest == 0
+                     ? "Videos already in the channel or playlist are skipped; only ones added from now on download."
+                     : "New videos download automatically from now on.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -103,10 +127,12 @@ struct SubscriptionsView: View {
         guard !link.trimmingCharacters(in: .whitespaces).isEmpty, !adding else { return }
         adding = true
         error = nil
+        notice = nil
         Task {
             do {
-                try await subscriptions.add(link: link, quality: quality, downloadLatest: latest)
+                try await subscriptions.add(link: link, quality: quality, downloadLatest: latest, folder: folder)
                 link = ""
+                folder = nil
             } catch {
                 self.error = error.localizedDescription
             }
@@ -114,9 +140,37 @@ struct SubscriptionsView: View {
         }
     }
 
+    static func chooseFolder(startingAt start: URL? = nil) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use Folder"
+        panel.message = "Choose where this subscription saves. Videos already in the folder won't be downloaded again."
+        panel.directoryURL = start ?? Prefs.downloadFolder
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    private func downloadExisting(_ sub: Subscription) {
+        error = nil
+        notice = nil
+        Task {
+            do {
+                let count = try await subscriptions.downloadExisting(sub.id)
+                notice = count == 0
+                    ? "Everything in \(sub.title) is already downloaded or in the list."
+                    : "Added \(count) video\(count == 1 ? "" : "s") from \(sub.title) to Downloads."
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
     @ViewBuilder
     private func menu(for sub: Subscription) -> some View {
         Button("Check Now") { Task { await subscriptions.check(sub.id) } }
+        Button("Download Existing Videos") { downloadExisting(sub) }
         Button(sub.enabled ? "Pause Subscription" : "Resume Subscription") {
             subscriptions.setEnabled(sub.id, !sub.enabled)
         }
@@ -129,6 +183,19 @@ struct SubscriptionsView: View {
                 }
             }
         }
+        Menu("Save To") {
+            Button("Choose Folder…") {
+                if let url = Self.chooseFolder(startingAt: sub.folderURL) { subscriptions.setFolder(sub.id, url) }
+            }
+            if sub.folder != nil {
+                Button("Reel's Download Folder") { subscriptions.setFolder(sub.id, nil) }
+            }
+        }
+        Button("Show Folder in Finder") {
+            let url = sub.folderURL ?? Prefs.downloadFolder
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(url)
+        }
         Button("Open in Browser") { if let url = URL(string: sub.link) { NSWorkspace.shared.open(url) } }
         Divider()
         Button("Unsubscribe", role: .destructive) {
@@ -140,6 +207,7 @@ struct SubscriptionsView: View {
 private struct SubscriptionRow: View {
     let sub: Subscription
     let checking: Bool
+    let downloadExisting: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -163,14 +231,26 @@ private struct SubscriptionRow: View {
                 .lineLimit(1)
             }
             Spacer()
-            if checking { ProgressView().controlSize(.small) }
+            if checking {
+                ProgressView().controlSize(.small)
+            } else if sub.enabled {
+                Button("Download Existing", systemImage: "arrow.down.circle", action: downloadExisting)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .help("Download the videos already in \(sub.title)")
+            }
         }
         .padding(.vertical, 4)
     }
 
     private var detail: String {
         var parts = [Quality(rawValue: sub.quality)?.label ?? "Best"]
-        parts.append(sub.downloadedCount == 1 ? "1 downloaded" : "\(sub.downloadedCount) downloaded")
+        switch sub.downloadedCount {
+        case 0: parts.append("waiting for new videos")
+        case 1: parts.append("1 downloaded")
+        default: parts.append("\(sub.downloadedCount) downloaded")
+        }
+        if let folder = sub.folderURL { parts.append("in \(folder.lastPathComponent)") }
         if let checked = sub.lastChecked {
             parts.append("checked \(checked.formatted(.relative(presentation: .named)))")
         }
