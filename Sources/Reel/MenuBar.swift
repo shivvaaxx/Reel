@@ -1,13 +1,42 @@
 import AppKit
 import SwiftUI
 
+/// A floating panel that can take keyboard input without activating Reel, and appears
+/// over every Space, including full-screen apps.
+final class MenuPanelWindow: NSPanel {
+    init(content: NSViewController) {
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 370, height: 300),
+                   styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
+                   backing: .buffered, defer: true)
+        contentViewController = content
+        isFloatingPanel = true
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        animationBehavior = .utilityWindow
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    override func cancelOperation(_ sender: Any?) {
+        MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
+    }
+}
+
 /// Reel's menu bar icon: drop links onto it to download them, click it to see progress.
 @MainActor
 final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination {
     static let shared = MenuBarController()
 
     private var item: NSStatusItem?
-    private let popover = NSPopover()
+    private var panel: MenuPanelWindow?
+    private var clickMonitor: Any?
+    private var lastHidden = Date.distantPast
     private var timer: Timer?
     private var lastIconKey = ""
     private var acceptedUntil: Date?
@@ -31,13 +60,21 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
         button.window?.delegate = self
         self.item = item
 
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentViewController = NSHostingController(
+        let host = NSHostingController(
             rootView: MenuPanel()
                 .environment(Shared.engine)
                 .environment(Shared.queue)
         )
+        host.sizingOptions = .preferredContentSize
+        let panel = MenuPanelWindow(content: host)
+        // Keep the panel pinned under the icon as its content grows or shrinks.
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { _ in
+            MainActor.assumeIsolated { MenuBarController.shared.positionPanel() }
+        }
+        NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { _ in
+            MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
+        }
+        self.panel = panel
 
         timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
             MainActor.assumeIsolated { MenuBarController.shared.refreshIcon() }
@@ -47,25 +84,55 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
     private func uninstall() {
         timer?.invalidate()
         timer = nil
-        popover.performClose(nil)
+        hidePanel()
+        panel = nil
         if let item { NSStatusBar.system.removeStatusItem(item) }
         item = nil
         lastIconKey = ""
     }
 
+    var isPanelShown: Bool { panel?.isVisible ?? false }
+
     @objc private func togglePanel() {
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
+        if isPanelShown {
+            hidePanel()
+        } else if Date().timeIntervalSince(lastHidden) > 0.25 {
+            // (A click on the icon first hides the panel by taking focus; don't reopen it.)
             showPanel()
         }
     }
 
     func showPanel() {
-        guard let button = item?.button else { return }
-        NSApp.activate()
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        guard let panel, item?.button != nil else { return }
+        positionPanel()
+        // No NSApp.activate(): activating would pull the user out of a full-screen app.
+        panel.makeKeyAndOrderFront(nil)
+        item?.button?.highlight(true)
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
+            MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
+        }
+    }
+
+    func hidePanel() {
+        guard let panel, panel.isVisible else { return }
+        panel.orderOut(nil)
+        item?.button?.highlight(false)
+        lastHidden = Date()
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
+    }
+
+    /// Places the panel just below the icon, kept on screen.
+    func positionPanel() {
+        guard let panel, let buttonWindow = item?.button?.window,
+              let screen = buttonWindow.screen ?? NSScreen.main else { return }
+        let icon = buttonWindow.frame
+        let size = panel.frame.size
+        let visible = screen.frame
+        var x = icon.midX - size.width / 2
+        x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
+        let y = icon.minY - size.height - 6
+        panel.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
     }
 
     // MARK: Icon
@@ -171,7 +238,9 @@ struct MenuPanel: View {
     @Environment(Engine.self) private var engine
     @State private var link = ""
     @State private var copied: String?
+    @State private var dropTargeted = false
     @FocusState private var focused: Bool
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -179,12 +248,17 @@ struct MenuPanel: View {
                 Text("Reel").font(.headline)
                 Spacer()
                 Button {
+                    MenuBarController.shared.hidePanel()
                     Shared.openMainWindow()
                 } label: {
                     Image(systemName: "macwindow")
                 }
                 .help("Open Reel Window")
-                SettingsLink {
+                Button {
+                    MenuBarController.shared.hidePanel()
+                    NSApp.activate()
+                    openSettings()
+                } label: {
                     Image(systemName: "gearshape")
                 }
                 .help("Settings")
@@ -263,13 +337,36 @@ struct MenuPanel: View {
                 Spacer()
                 Button("Clear Finished") { withAnimation { queue.clearFinished() } }
                     .disabled(!queue.hasClearable)
-                Button("Quit") { NSApp.terminate(nil) }
+                Button("Quit") {
+                    MenuBarController.shared.hidePanel()
+                    NSApp.activate()
+                    NSApp.terminate(nil)
+                }
             }
             .buttonStyle(.borderless)
             .font(.callout)
         }
         .padding(14)
         .frame(width: 370)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(Color.accentColor, lineWidth: 2.5)
+                    .allowsHitTesting(false)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            let links = urls.filter { ["http", "https"].contains($0.scheme?.lowercased() ?? "") }
+            links.forEach { queue.quickAdd($0.absoluteString) }
+            return !links.isEmpty
+        } isTargeted: { dropTargeted = $0 }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            // The panel is reused; refresh the clipboard suggestion each time it opens.
+            guard (note.object as? NSWindow) is MenuPanelWindow else { return }
+            refreshCopied()
+            focused = true
+        }
         .onAppear {
             copied = ContentView.copiedLink().flatMap { candidate in
                 queue.jobs.contains(where: { $0.link == candidate }) ? nil : candidate
@@ -283,6 +380,12 @@ struct MenuPanel: View {
         if active > 0 { return active == 1 ? "1 download in progress" : "\(active) downloads in progress" }
         let done = queue.jobs.filter { $0.status == .finished }.count
         return done > 0 ? "All downloads finished" : "Ready"
+    }
+
+    private func refreshCopied() {
+        copied = ContentView.copiedLink().flatMap { candidate in
+            queue.jobs.contains(where: { $0.link == candidate }) ? nil : candidate
+        }
     }
 
     private func add() {
