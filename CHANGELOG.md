@@ -4,6 +4,8 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-04
+
 ### Added
 - **A folder menu on every subscription**, so one can save to Downloads and another to iCloud Drive. The menu at the top sets the default for subscriptions you haven't changed.
 - **Earlier downloads join the Library.** When Reel checks a subscription's folder, videos it finds there (by "Where from", embedded details, video ID or matching title, so downloads from other apps count too) are added to the Library and not downloaded again.
