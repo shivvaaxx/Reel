@@ -90,6 +90,9 @@ struct ReelApp: App {
         .defaultLaunchBehavior(Shared.showInDock ? .presented : .suppressed)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton()
+            }
             CommandGroup(replacing: .newItem) {
                 Button("New Download") {
                     Shared.openMainWindow()
@@ -158,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
         MainActor.assumeIsolated {
+            _ = Updater.shared   // starts Sparkle's scheduled checks
             Shared.applyPresence()
             // The window's .task normally starts setup; when launching menu-bar-only it may not exist.
             Task { @MainActor in

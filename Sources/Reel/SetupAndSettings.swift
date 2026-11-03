@@ -423,7 +423,11 @@ private struct EngineSettings: View {
                 }
             }
 
-            Section {
+            Section("Reel") {
+                UpdateSettings()
+            }
+
+            Section("Download Tools") {
                 Toggle(isOn: $autoUpdate) {
                     Text("Keep tools up to date automatically")
                     Text("Checks yt-dlp and gallery-dl daily and the other tools monthly. Sites change often, so this keeps downloads working.")
