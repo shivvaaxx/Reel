@@ -121,6 +121,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             // `open -a Reel --args --download <link> [<link>…]` queues links at launch.
             let args = CommandLine.arguments
+            if args.contains("--show-panel") {   // used for visual testing
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    MenuBarController.shared.showPanel()
+                }
+            }
             if let flag = args.firstIndex(of: "--download") {
                 for link in args[(flag + 1)...] where link.hasPrefix("http") {
                     Shared.queue.quickAdd(link)

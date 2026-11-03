@@ -36,7 +36,7 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
     private var item: NSStatusItem?
     private var panel: MenuPanelWindow?
-    private var hostingView: NSHostingView<AnyView>?
+    private var hostingController: NSHostingController<AnyView>?
     private var clickMonitor: Any?
     private var lastHidden = Date.distantPast
     private var timer: Timer?
@@ -64,18 +64,29 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
         // The panel never sizes itself during layout (that loops and crashes AppKit);
         // positionPanel() measures the content and sets the frame explicitly.
-        let hosting = NSHostingView(rootView: AnyView(
+        let controller = NSHostingController(rootView: AnyView(
             MenuPanel()
                 .environment(Shared.engine)
                 .environment(Shared.queue)
         ))
-        hosting.sizingOptions = []
-        // The window itself is the rounded glass shape, so no rectangular edge or shadow shows.
-        let glass = NSGlassEffectView()
+        controller.sizingOptions = []
+        let hosting = controller.view
+        // Everything in the window is clipped to one rounded shape at the layer level, so
+        // no rectangular edge can show and the shadow follows the curve.
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 370, height: 300))
+        container.wantsLayer = true
+        container.layer?.cornerRadius = MenuPanel.cornerRadius
+        container.layer?.cornerCurve = .continuous
+        container.layer?.masksToBounds = true
+        let glass = NSGlassEffectView(frame: container.bounds)
         glass.cornerRadius = MenuPanel.cornerRadius
-        glass.contentView = hosting
-        let panel = MenuPanelWindow(content: glass)
-        hostingView = hosting
+        glass.autoresizingMask = [.width, .height]
+        hosting.frame = container.bounds
+        hosting.autoresizingMask = [.width, .height]
+        container.addSubview(glass)
+        container.addSubview(hosting)
+        let panel = MenuPanelWindow(content: container)
+        hostingController = controller
         NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { _ in
             MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
         }
@@ -129,9 +140,10 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
     /// Sizes the panel to its content and places it just below the icon, kept on screen.
     func positionPanel() {
-        guard let panel, let hostingView, let buttonWindow = item?.button?.window,
+        guard let panel, let hostingController, let buttonWindow = item?.button?.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
-        let fitting = hostingView.fittingSize
+        // Measure at the panel's real width; an unconstrained measurement comes out too short.
+        let fitting = hostingController.sizeThatFits(in: NSSize(width: 370, height: 10_000))
         let size = NSSize(width: 370, height: min(max(fitting.height, 120), screen.visibleFrame.height - 40).rounded())
         let icon = buttonWindow.frame
         let visible = screen.frame
