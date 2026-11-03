@@ -338,14 +338,16 @@ final class Engine {
 
     // MARK: Look up
 
-    func probe(_ link: String) async throws -> MediaInfo {
+    /// Looks up a link. `latest` limits playlists/channels to their newest N entries (fast).
+    func probe(_ link: String, latest: Int? = nil) async throws -> MediaInfo {
         while phase == .installing || phase == .checking {
             try await Task.sleep(for: .milliseconds(300))
         }
         guard isReady else { throw EngineError.notReady }
         let result = try await Shell.run(
             path(.ytdlp),
-            baseArguments + Prefs.cookieArguments(for: link) + ["-J", "--flat-playlist", "--no-warnings", "--", link],
+            baseArguments + Prefs.cookieArguments(for: link) + ["-J", "--flat-playlist", "--no-warnings"]
+                + (latest.map { ["--playlist-items", "1:\($0)"] } ?? []) + ["--", link],
             environment: environment
         )
         guard result.status == 0,

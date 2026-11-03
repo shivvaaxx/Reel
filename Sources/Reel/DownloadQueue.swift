@@ -815,6 +815,10 @@ final class DownloadQueue {
                 if !sizes.isEmpty { job.fileSize = Double(sizes.reduce(0, +)) }
                 if !job.options.isClip { library.record(job) }
                 Notifier.downloadFinished(job)
+                Task { [weak job] in
+                    let notes = await Integrations.handOff(files)
+                    job?.log.append(contentsOf: notes)
+                }
             } else if job.kind == .gallery && exitStatus == 0 {
                 job.status = .failed("There was nothing to save in this post.")
             } else {
