@@ -174,6 +174,7 @@ private struct DownloadSettings: View {
     @AppStorage("subtitles") private var subtitles = false
     @AppStorage("subtitleLanguage") private var subtitleLanguage = "en"
     @AppStorage("connections") private var connections = 8
+    @AppStorage("proxy") private var proxy = ""
 
     var body: some View {
         Form {
@@ -207,6 +208,12 @@ private struct DownloadSettings: View {
                 if subtitles {
                     TextField("Subtitle language", text: $subtitleLanguage, prompt: Text("en"))
                 }
+            }
+            Section {
+                TextField("Proxy", text: $proxy, prompt: Text("None"))
+            } footer: {
+                Text("For videos blocked in your country. Enter a proxy address such as socks5://127.0.0.1:1080 or http://host:port. Leave empty to connect directly.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

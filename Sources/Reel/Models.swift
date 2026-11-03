@@ -68,11 +68,18 @@ struct DownloadOptions {
 
     /// gallery-dl arguments for photo posts.
     func galleryArguments(for link: String) -> [String] {
-        var args = ["-D", folder.path]
-        if Prefs.site(for: link) == .instagram {
-            args += ["-f", "{username} {shortcode}{num:? //}.{extension}"]
+        // @@G reports "item n of count" before each file, for progress.
+        var args = ["-D", folder.path, "--Print", "prepare:@@G {num}|{count:?//}"]
+        switch Prefs.site(for: link) {
+        case .instagram:
+            args += ["-f", "{username} {shortcode}{num:? //>02}.{extension}"]
+        case .tiktok:
+            // Readable names instead of TikTok's internal file IDs.
+            args += ["-f", "{user} {title[b:120]}{num:? //>02}.{extension}"]
+        default:
+            break
         }
-        args += Prefs.cookieArguments(for: link)
+        args += Prefs.cookieArguments(for: link) + Prefs.proxyArguments
         args += ["--", link]
         return args
     }
@@ -177,6 +184,12 @@ enum Prefs {
 
     static var defaultQuality: Quality {
         Quality(rawValue: UserDefaults.standard.string(forKey: "defaultQuality") ?? "") ?? .best
+    }
+
+    /// Optional proxy for all downloads, e.g. "socks5://127.0.0.1:1080" (Settings › Downloads).
+    static var proxyArguments: [String] {
+        let proxy = (UserDefaults.standard.string(forKey: "proxy") ?? "").trimmingCharacters(in: .whitespaces)
+        return proxy.isEmpty ? [] : ["--proxy", proxy]
     }
 
     /// "none" or a browser name yt-dlp and gallery-dl understand.

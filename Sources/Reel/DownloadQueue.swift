@@ -32,6 +32,11 @@ final class DownloadJob: Identifiable {
 
     /// Connections in use while the accelerator is fetching (nil otherwise).
     var activeConnections: Int?
+    /// When geo-blocked: the countries the site says it is available in.
+    var availableIn: [String]?
+    /// Photo posts: which item is being saved, and how many there are (if known).
+    var galleryIndex: Int?
+    var galleryCount: Int?
 
     @ObservationIgnored var process: Process?
     @ObservationIgnored var accelerator: SegmentedDownloader?
@@ -90,6 +95,9 @@ final class DownloadJob: Identifiable {
         speed = nil
         eta = nil
         galleryFiles = []
+        galleryIndex = nil
+        galleryCount = nil
+        availableIn = nil
         completedStreamBytes = 0
         currentFormat = nil
         currentStreamTotal = 0
@@ -111,7 +119,11 @@ extension DownloadJob {
     /// nil means indeterminate.
     var barValue: Double? {
         if case .processing = status { return nil }
-        return kind == .gallery ? nil : fraction
+        if kind == .gallery {
+            guard let index = galleryIndex, let count = galleryCount, count > 0 else { return nil }
+            return min(Double(index - 1) / Double(count), 0.99)
+        }
+        return fraction
     }
 
     var isFailed: Bool { if case .failed = status { true } else { false } }
@@ -126,6 +138,9 @@ extension DownloadJob {
             return downloadedBytes > 0 ? "Resuming…" : "Starting…"
         case .downloading:
             if kind == .gallery {
+                if let index = galleryIndex, let count = galleryCount, count > 1 {
+                    return "Saving \(index) of \(count)…"
+                }
                 let n = galleryFiles.count
                 return n == 0 ? "Saving…" : "Saving… \(n) \(n == 1 ? "item" : "items") so far"
             }
@@ -363,6 +378,10 @@ final class DownloadQueue {
                 placeholder.title = "\(Prefs.siteName(for: link)) post"
                 placeholder.status = .queued
                 pump()
+            } catch EngineError.geoBlocked(let message, let countries) {
+                placeholder.availableIn = countries
+                placeholder.status = .failed(message)
+                updateBadge()
             } catch {
                 placeholder.status = .failed(error.localizedDescription)
                 updateBadge()
@@ -640,6 +659,13 @@ final class DownloadQueue {
 
     /// gallery-dl prints each saved file's path ("# path" if it already existed).
     private func handleGallery(_ line: String, for job: DownloadJob) {
+        if line.hasPrefix("@@G ") {
+            let parts = line.dropFirst(4).split(separator: "|", omittingEmptySubsequences: false)
+            job.galleryIndex = parts.first.flatMap { Int($0) }.map { max($0, 1) }
+            job.galleryCount = parts.count > 1 ? Int(parts[1]) : nil
+            job.status = .downloading
+            return
+        }
         var path = line
         if path.hasPrefix("# ") { path.removeFirst(2) }
         if path.hasPrefix("/") {
@@ -714,9 +740,15 @@ final class DownloadQueue {
             } else if job.kind == .gallery && exitStatus == 0 {
                 job.status = .failed("There was nothing to save in this post.")
             } else {
-                job.status = .failed(job.lastError
-                    ?? Engine.readableError(job.log.joined(separator: "\n"),
-                                            fallback: "The download stopped unexpectedly (code \(exitStatus))."))
+                let output = job.log.joined(separator: "\n")
+                // Geo-blocks span several lines, so they're read from the whole log.
+                if let countries = Engine.geoRestriction(in: output) {
+                    job.availableIn = countries
+                    job.status = .failed(Engine.readableError(output, fallback: ""))
+                } else {
+                    job.status = .failed(job.lastError
+                        ?? Engine.readableError(output, fallback: "The download stopped unexpectedly (code \(exitStatus))."))
+                }
             }
         }
         pump()

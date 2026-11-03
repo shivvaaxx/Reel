@@ -142,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Set before the first window appears so a hidden Dock icon never flashes.
         MainActor.assumeIsolated {
-            NSApp.setActivationPolicy(Shared.showInDock ? .regular : .accessory)
+            _ = NSApp.setActivationPolicy(Shared.showInDock ? .regular : .accessory)
         }
     }
 

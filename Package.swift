@@ -9,6 +9,12 @@ let package = Package(
             name: "Reel",
             path: "Sources/Reel",
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
+        .testTarget(
+            name: "ReelTests",
+            dependencies: ["Reel"],
+            path: "Tests/ReelTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )
