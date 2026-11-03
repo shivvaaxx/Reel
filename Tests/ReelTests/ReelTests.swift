@@ -243,6 +243,11 @@ struct SubscriptionWindowTests {
 
 @Suite("Folder index")
 struct FolderIndexTests {
+    @Test func iCloudPlaceholdersKeepTheirNames() {
+        #expect(FolderIndex.placeholderName(".Me at the zoo [jNQXAC9IVRw].mp4.icloud") == "Me at the zoo [jNQXAC9IVRw].mp4")
+        #expect(FolderIndex.placeholderName("Episode.mp4") == nil)
+    }
+
     @Test func youTubeIDsInFileNames() {
         #expect(FolderIndex.youTubeID(inName: "Me at the zoo [jNQXAC9IVRw]") == "jNQXAC9IVRw")
         #expect(FolderIndex.youTubeID(inName: "Me at the zoo") == nil)
@@ -263,5 +268,27 @@ struct FolderIndexTests {
         #expect(SourceTag.read(moved) == "https://youtu.be/jNQXAC9IVRw?si=share")
         let keys = await FolderIndex.keys(in: root, ffprobe: nil, environment: nil)
         #expect(keys == ["youtube:jNQXAC9IVRw"])
+    }
+}
+
+@Suite("Subscription folders")
+@MainActor
+struct SubscriptionFolderTests {
+    @Test func ownFolderWinsOtherwiseTheDefault() {
+        let key = Subscriptions.defaultFolderKey
+        let saved = UserDefaults.standard.string(forKey: key)
+        defer { UserDefaults.standard.set(saved, forKey: key) }
+        UserDefaults.standard.set("/Users/test/iCloud Shows", forKey: key)
+
+        var plain = Subscription(link: "https://youtube.com/playlist?list=PL1", title: "A", quality: "best")
+        var own = Subscription(link: "https://youtube.com/playlist?list=PL2", title: "B", quality: "best")
+        own.folder = "/Users/test/Downloads/B"
+        #expect(Subscriptions.folder(for: plain).path == "/Users/test/iCloud Shows")
+        #expect(Subscriptions.folder(for: own).path == "/Users/test/Downloads/B")
+
+        UserDefaults.standard.removeObject(forKey: key)
+        #expect(Subscriptions.folder(for: plain) == Prefs.downloadFolder)
+        plain.folder = nil
+        #expect(Subscriptions.folder(for: own).path == "/Users/test/Downloads/B")
     }
 }

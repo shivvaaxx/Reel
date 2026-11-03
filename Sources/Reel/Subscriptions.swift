@@ -38,6 +38,19 @@ final class Subscriptions {
     /// `downloadLatest` value meaning "everything already in the playlist".
     static let everything = Int.max
 
+    /// Where subscriptions save unless they have their own folder (unset = Reel's download folder).
+    static let defaultFolderKey = "subscriptionDefaultFolder"
+
+    static var defaultFolder: URL {
+        guard let path = UserDefaults.standard.string(forKey: defaultFolderKey), !path.isEmpty else {
+            return Prefs.downloadFolder
+        }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    /// The folder a subscription actually saves to: its own, or the default.
+    static func folder(for sub: Subscription) -> URL { sub.folderURL ?? defaultFolder }
+
     /// Channels list newest first, so their newest uploads are enough. Playlists usually add
     /// videos at the end, so they're read in full (flat listings are quick).
     static func lookupWindow(for link: String) -> Int? {
@@ -77,7 +90,7 @@ final class Subscriptions {
 
     /// What's already on disk for a subscription: link keys found in its folder.
     private func folderKeys(for sub: Subscription) async -> Set<String> {
-        guard let folder = sub.folderURL else { return [] }
+        let folder = Self.folder(for: sub)
         let ffprobe = engine.path(.ffprobe)
         let environment = engine.environment
         return await Task.detached(priority: .utility) {
@@ -91,13 +104,12 @@ final class Subscriptions {
     /// otherwise Reel's library does.
     private func alreadyHave(_ entry: MediaInfo.Entry, in sub: Subscription, folderKeys: Set<String>) -> Bool {
         if queue.isQueued(entry.url) { return true }
-        if let folder = sub.folderURL {
-            if folderKeys.contains(LinkKey.key(for: entry.url)) { return true }
-            let inside = folder.standardizedFileURL.path + "/"
-            return queue.library.existing(for: entry.url)?.existingFiles
-                .contains { $0.standardizedFileURL.path.hasPrefix(inside) } ?? false
-        }
-        return queue.library.existing(for: entry.url) != nil
+        if folderKeys.contains(LinkKey.key(for: entry.url)) { return true }
+        guard let existing = queue.library.existing(for: entry.url) else { return false }
+        // On the default folder, a copy anywhere counts. With its own folder, only a copy in it does.
+        guard sub.folder != nil else { return true }
+        let inside = Self.folder(for: sub).standardizedFileURL.path + "/"
+        return existing.existingFiles.contains { $0.standardizedFileURL.path.hasPrefix(inside) }
     }
 
     /// Subscribes; `downloadLatest` grabs the newest N right away, the rest are marked as seen.
@@ -124,7 +136,7 @@ final class Subscriptions {
         if !latest.isEmpty { onDisk = await folderKeys(for: sub) }
         for entry in latest.reversed() where !alreadyHave(entry, in: sub, folderKeys: onDisk) {
             queue.enqueue(link: entry.url, title: entry.title, thumbnail: entry.thumbnail, quality: quality,
-                          folder: sub.folderURL)
+                          folder: Self.folder(for: sub))
             sub.downloadedCount += 1
         }
         items.insert(sub, at: 0)
@@ -145,7 +157,7 @@ final class Subscriptions {
         var queued = 0
         for entry in info.entries.reversed() where !alreadyHave(entry, in: items[i], folderKeys: onDisk) {
             queue.enqueue(link: entry.url, title: entry.title, thumbnail: entry.thumbnail, quality: quality,
-                          folder: items[i].folderURL)
+                          folder: Self.folder(for: items[i]))
             queued += 1
         }
         items[i].downloadedCount += queued
@@ -217,7 +229,7 @@ final class Subscriptions {
             let fresh = info.entries.filter { !items[i].knownIDs.contains($0.id) }
             for entry in fresh.reversed() where !alreadyHave(entry, in: items[i], folderKeys: onDisk) {
                 queue.enqueue(link: entry.url, title: entry.title, thumbnail: entry.thumbnail, quality: quality,
-                              folder: items[i].folderURL)
+                              folder: Self.folder(for: items[i]))
                 items[i].downloadedCount += 1
             }
             items[i].knownIDs.formUnion(info.entries.map(\.id))
