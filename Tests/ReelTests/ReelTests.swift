@@ -292,3 +292,21 @@ struct SubscriptionFolderTests {
         #expect(Subscriptions.folder(for: own).path == "/Users/test/Downloads/B")
     }
 }
+
+@Suite("Matching files to videos by title")
+struct TitleMatchTests {
+    @Test("yt-dlp file names match their video titles", arguments: [
+        ("Celebrity Master Chef (2026) - Tamil S01E04 | Mystery Ingredient Elimination Challenge",
+         "Celebrity Master Chef (2026) - Tamil S01E04 ｜ Mystery Ingredient Elimination Challenge"),
+        ("Celebrity Master Chef  (2026) - Tamil S01 EP10", "Celebrity Master Chef  (2026) - Tamil S01 EP10"),
+        ("AC/DC: Live", "AC⧸DC： Live"),
+    ])
+    func matches(title: String, fileName: String) {
+        #expect(FolderIndex.titleKey(title) == FolderIndex.titleKey(fileName))
+    }
+
+    @Test func differentEpisodesDoNotMatch() {
+        #expect(FolderIndex.titleKey("Celebrity Master Chef (2026) Tamil S01 EP01")
+                != FolderIndex.titleKey("Celebrity Master Chef (2026) Tamil S01 EP02"))
+    }
+}

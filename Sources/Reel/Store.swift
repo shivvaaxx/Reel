@@ -113,6 +113,23 @@ final class Library {
         save()
     }
 
+    /// Adds a file found on disk (downloaded before, or by another app) unless the Library
+    /// already has this video. Returns whether it was added.
+    @discardableResult
+    func importExisting(link: String, title: String, thumbnail: URL?, file: URL, quality: String) -> Bool {
+        let key = LinkKey.key(for: link)
+        if items.contains(where: { $0.key == key && $0.isAvailable }) { return false }
+        let values = try? file.resourceValues(forKeys: [.fileSizeKey, .creationDateKey])
+        items.removeAll { $0.key == key && !$0.isAvailable }
+        items.insert(LibraryItem(
+            id: UUID(), key: key, link: link, title: title, site: Prefs.siteName(for: link),
+            thumbnail: thumbnail?.absoluteString, files: [file.path], size: values?.fileSize.map(Double.init),
+            date: values?.creationDate ?? Date(), isGallery: false, quality: quality
+        ), at: 0)
+        save()
+        return true
+    }
+
     /// A previous download of the same media whose files are still on disk.
     func existing(for link: String) -> LibraryItem? {
         let key = LinkKey.key(for: link)

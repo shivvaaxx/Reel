@@ -88,15 +88,55 @@ final class Subscriptions {
         }
     }
 
-    /// What's already on disk for a subscription: link keys found in its folder.
-    private func folderKeys(for sub: Subscription) async -> Set<String> {
+    /// Reads a subscription's folder and returns the link keys of what's there. Files that
+    /// match one of its videos, by source link, video ID or title, are tagged with that video
+    /// and added to the Library, so earlier downloads (from Reel or other apps) show up there.
+    @discardableResult
+    private func syncFolder(for sub: Subscription, entries: [MediaInfo.Entry]) async -> Set<String> {
         let folder = Self.folder(for: sub)
         let ffprobe = engine.path(.ffprobe)
         let environment = engine.environment
-        return await Task.detached(priority: .utility) {
-            await FolderIndex.keys(in: folder, ffprobe: FileManager.default.isExecutableFile(atPath: ffprobe.path) ? ffprobe : nil,
+        let found = await Task.detached(priority: .utility) {
+            await FolderIndex.scan(folder, ffprobe: FileManager.default.isExecutableFile(atPath: ffprobe.path) ? ffprobe : nil,
                                    environment: environment)
         }.value
+
+        var keys = Set(found.compactMap(\.key))
+        var byKey: [String: URL] = [:]
+        var byTitle: [String: URL] = [:]
+        for item in found {
+            if let key = item.key {
+                byKey[key] = byKey[key] ?? item.file
+            } else {
+                let title = FolderIndex.titleKey(item.name)
+                if !title.isEmpty { byTitle[title] = byTitle[title] ?? item.file }
+            }
+        }
+        let quality = Quality(rawValue: sub.quality) ?? Prefs.defaultQuality
+        for entry in entries {
+            let key = LinkKey.key(for: entry.url)
+            var file = byKey[key]
+            if file == nil, let match = byTitle[FolderIndex.titleKey(entry.title)] {
+                SourceTag.stamp(match, link: entry.url)   // recognised instantly next time
+                byTitle[FolderIndex.titleKey(entry.title)] = nil
+                keys.insert(key)
+                file = match
+            }
+            if let file {
+                queue.library.importExisting(link: entry.url, title: entry.title, thumbnail: entry.thumbnail,
+                                             file: file, quality: quality.rawValue)
+            }
+        }
+        return keys
+    }
+
+    /// Re-reads a subscription's folder now (after its folder changes, for example).
+    func refreshFolder(_ id: UUID) async {
+        guard engine.isReady, !checking.contains(id), let sub = items.first(where: { $0.id == id }) else { return }
+        checking.insert(id)
+        defer { checking.remove(id) }
+        guard let info = try? await engine.probe(sub.link, latest: Self.lookupWindow(for: sub.link)) else { return }
+        await syncFolder(for: sub, entries: info.entries)
     }
 
     /// Whether an entry is already downloaded or on its way. With its own folder, the folder
@@ -132,8 +172,7 @@ final class Subscriptions {
         sub.knownIDs = Set(info.entries.map(\.id))
         sub.lastChecked = Date()
         let latest = info.entries.prefix(max(downloadLatest, 0))
-        var onDisk = Set<String>()
-        if !latest.isEmpty { onDisk = await folderKeys(for: sub) }
+        let onDisk = await syncFolder(for: sub, entries: info.entries)
         for entry in latest.reversed() where !alreadyHave(entry, in: sub, folderKeys: onDisk) {
             queue.enqueue(link: entry.url, title: entry.title, thumbnail: entry.thumbnail, quality: quality,
                           folder: Self.folder(for: sub))
@@ -151,7 +190,7 @@ final class Subscriptions {
         checking.insert(id)
         defer { checking.remove(id) }
         let info = try await engine.probe(sub.link)
-        let onDisk = await folderKeys(for: sub)
+        let onDisk = await syncFolder(for: sub, entries: info.entries)
         guard let i = items.firstIndex(where: { $0.id == id }) else { return 0 }
         let quality = Quality(rawValue: items[i].quality) ?? Prefs.defaultQuality
         var queued = 0
@@ -182,6 +221,7 @@ final class Subscriptions {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         items[i].folder = folder?.path
         save()
+        Task { await refreshFolder(id) }
     }
 
     func setQuality(_ id: UUID, _ quality: Quality) {
@@ -220,10 +260,8 @@ final class Subscriptions {
         defer { checking.remove(id) }
         do {
             let info = try await engine.probe(sub.link, latest: Self.lookupWindow(for: sub.link))
-            var onDisk = Set<String>()
-            if info.entries.contains(where: { !sub.knownIDs.contains($0.id) }) {
-                onDisk = await folderKeys(for: sub)
-            }
+            // Every check also reads the folder, so videos moved in by hand reach the Library.
+            let onDisk = await syncFolder(for: sub, entries: info.entries)
             guard let i = items.firstIndex(where: { $0.id == id }) else { return }
             let quality = Quality(rawValue: items[i].quality) ?? Prefs.defaultQuality
             let fresh = info.entries.filter { !items[i].knownIDs.contains($0.id) }
