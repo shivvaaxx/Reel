@@ -7,6 +7,15 @@
     <language>en</language>
     <!-- release.sh adds new versions below this line -->
     <item>
+      <title>Reel 1.3.0</title>
+      <pubDate>Wed, 04 Nov 2026 06:57:53 +0800</pubDate>
+      <sparkle:version>24</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<h3>Added</h3><ul><li><b>A folder menu on every subscription</b>, so one can save to Downloads and another to iCloud Drive. The menu at the top sets the default for subscriptions you haven&#x27;t changed.</li><li><b>Earlier downloads join the Library.</b> When Reel checks a subscription&#x27;s folder, videos it finds there (by &quot;Where from&quot;, embedded details, video ID or matching title, so downloads from other apps count too) are added to the Library and not downloaded again.</li><li><b>Show in Finder and Move to Trash buttons</b> on every Library item, so you never have to hunt for a file. Moving to the Trash also removes it from the Library.</li><li>Launch option <code>--folder &lt;path&gt;</code> saves downloads to a chosen folder.</li></ul><h3>Changed</h3><ul><li>Subscription folders in iCloud Drive are checked without downloading iCloud-only videos back to this Mac, and busy folders like Downloads are no longer re-read in full on every check.</li><li>Downloading a video into the same folder again replaces its earlier Library entry.</li></ul>]]></description>
+      <enclosure url="https://github.com/shivvaaxx/Reel/releases/download/v1.3.0/Reel-1.3.0.dmg" sparkle:edSignature="vyq6QvjJ/t/eaiyKj+RKSN3IBtM2EnMrukKNGdrZQ0UL4eFFDDnv/uVRc09QKU7CcxeHje35QGsyY60nsQ4wBw==" length="4898325" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Reel 1.2.0</title>
       <pubDate>Wed, 04 Nov 2026 06:33:00 +0800</pubDate>
       <sparkle:version>17</sparkle:version>
