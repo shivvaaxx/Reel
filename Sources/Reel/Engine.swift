@@ -137,6 +137,11 @@ final class Engine {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = binDir.path + ":/usr/bin:/bin:/usr/sbin:/sbin"
         env["PYTHONUNBUFFERED"] = "1"
+        // The static FFmpeg build carries its own OpenSSL, which can't find macOS's trusted
+        // certificates; without this, anything FFmpeg fetches itself (clips, some streams) fails.
+        if env["SSL_CERT_FILE"] == nil, FileManager.default.fileExists(atPath: "/etc/ssl/cert.pem") {
+            env["SSL_CERT_FILE"] = "/etc/ssl/cert.pem"
+        }
         return env
     }
 

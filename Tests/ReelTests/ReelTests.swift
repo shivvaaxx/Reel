@@ -103,9 +103,56 @@ struct ArgumentTests {
         #expect(i.map { args[$0 + 1] } == "*80.00-125.00")
     }
 
+    @Test func fourKInCompatibleModeTakesTheHEVCPath() throws {
+        let o = options(.p2160)
+        #expect(o.usesHEVCConversion(for: "https://youtu.be/x"))
+        let f = try #require(format(o.selectionArguments(for: "https://youtu.be/x")))
+        #expect(f.hasPrefix("bv[height<=2160]+ba"))
+        #expect(!f.contains("avc"))
+        // 1080p and TikTok never need conversion.
+        #expect(!options(.p1080).usesHEVCConversion(for: "https://youtu.be/x"))
+        #expect(!o.usesHEVCConversion(for: "https://www.tiktok.com/@a/video/1"))
+        // Turning compatibility off means no conversion at all.
+        #expect(!options(.p2160, compatible: false).usesHEVCConversion(for: "https://youtu.be/x"))
+    }
+
+    @Test func speedLimitDisablesTheAccelerator() {
+        var o = options(.best)
+        #expect(o.canAccelerate)
+        o.rateLimit = 2.5
+        #expect(!o.canAccelerate)
+        let args = o.videoArguments(for: "https://youtu.be/x")
+        let i = args.firstIndex(of: "--limit-rate")
+        #expect(i.map { args[$0 + 1] } == "2560K")
+        #expect(o.galleryArguments(for: "https://instagram.com/p/x").contains("2560K"))
+    }
+
     @Test func linkComesAfterDoubleDash() {
         let args = options(.best).videoArguments(for: "-oops")
         #expect(args.suffix(2) == ["--", "-oops"])
+    }
+}
+
+@Suite("Schedule")
+struct ScheduleTests {
+    private func at(_ hour: Int, _ minute: Int = 0) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: Date())!
+    }
+
+    @Test func daytimeWindow() {
+        #expect(Schedule.isWithinWindow(at(10), start: 9 * 60, end: 17 * 60))
+        #expect(!Schedule.isWithinWindow(at(18), start: 9 * 60, end: 17 * 60))
+        #expect(!Schedule.isWithinWindow(at(17), start: 9 * 60, end: 17 * 60))   // end is exclusive
+    }
+
+    @Test func overnightWindow() {
+        #expect(Schedule.isWithinWindow(at(23, 30), start: 23 * 60, end: 7 * 60))
+        #expect(Schedule.isWithinWindow(at(3), start: 23 * 60, end: 7 * 60))
+        #expect(!Schedule.isWithinWindow(at(12), start: 23 * 60, end: 7 * 60))
+    }
+
+    @Test func minutesRoundTrip() {
+        #expect(Schedule.minutes(from: Schedule.date(fromMinutes: 95)) == 95)
     }
 }
 
