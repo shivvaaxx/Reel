@@ -55,6 +55,12 @@ struct ContentView: View {
                 .fixedSize()
             }
             if section == .downloads {
+                if let hold = queue.holdReason {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Start Now", systemImage: "bolt.fill") { queue.startNowDespiteHold() }
+                            .help("Downloads are waiting (\(hold)). Start them anyway.")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     if queue.hasPaused && !queue.hasPausable {
                         Button("Resume All", systemImage: "play.fill") { queue.resumeAll() }

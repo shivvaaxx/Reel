@@ -162,9 +162,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     MenuBarController.shared.showPanel()
                 }
             }
+            // Optional: --quality p1080|p2160|audio|… and --clip 1:20-3:45 (applies to every link).
+            func value(after flag: String) -> String? {
+                args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+            }
+            let quality = value(after: "--quality").flatMap(Quality.init(rawValue:))
+            let clip = value(after: "--clip").flatMap { text -> (Double?, Double?)? in
+                let parts = text.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                guard parts.count == 2 else { return nil }
+                return (TimeText.seconds(parts[0]), parts[1].isEmpty ? nil : TimeText.seconds(parts[1]))
+            }
             if let flag = args.firstIndex(of: "--download") {
                 for link in args[(flag + 1)...] where link.hasPrefix("http") {
-                    Shared.queue.quickAdd(link)
+                    if quality != nil || clip != nil {
+                        Shared.queue.enqueue(link: link, title: Prefs.siteName(for: link) + " link", thumbnail: nil,
+                                             quality: quality ?? Prefs.defaultQuality, clip: clip)
+                    } else {
+                        Shared.queue.quickAdd(link)
+                    }
                 }
             }
         }

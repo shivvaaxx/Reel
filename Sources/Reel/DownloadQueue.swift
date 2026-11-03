@@ -40,6 +40,10 @@ final class DownloadJob: Identifiable {
 
     @ObservationIgnored var process: Process?
     @ObservationIgnored var accelerator: SegmentedDownloader?
+    @ObservationIgnored var converter: HEVCConverter?
+    @ObservationIgnored var conversionChecked = false
+    /// Paused by the schedule or network rather than by the user; resumed automatically.
+    var autoPaused = false
     @ObservationIgnored var acceleratorTask: Task<Void, Never>?
     @ObservationIgnored var plan: AcceleratedPlan?
     @ObservationIgnored var completedStreamBytes: Double = 0
@@ -133,6 +137,7 @@ extension DownloadJob {
         case .resolving:
             return "Looking up…"
         case .queued:
+            if let hold = Shared.queue.holdReason { return "Waiting · \(hold)" }
             return "Waiting…"
         case .starting:
             return downloadedBytes > 0 ? "Resuming…" : "Starting…"
@@ -157,6 +162,7 @@ extension DownloadJob {
         case .processing(let step):
             return step
         case .paused:
+            if autoPaused, let hold = Shared.queue.holdReason { return "Paused · \(hold)" }
             return downloadedBytes > 0 ? "Paused · \(downloadedBytes.byteString)" : "Paused"
         case .finished:
             if kind == .gallery {
@@ -225,6 +231,61 @@ final class DownloadQueue {
         self.engine = engine
         self.library = library
         restore()
+        NetworkWatch.shared.onChange = { [weak self] in self?.applyHold() }
+        // The schedule window opens and closes on the clock, so check every half minute.
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyHold() }
+        }
+    }
+
+    // MARK: Schedule and network holds
+
+    @ObservationIgnored private var holdTimer: Timer?
+    /// "Start Now" overrides the hold until it next changes.
+    private var overriddenHold: String?
+    private var lastHold: String?
+
+    /// Why downloads are waiting right now, or nil if they may run.
+    var holdReason: String? {
+        let reason = currentHold
+        return reason == overriddenHold ? nil : reason
+    }
+
+    private var currentHold: String? {
+        let network = NetworkWatch.shared
+        if Schedule.pauseOnCostlyNetwork {
+            if network.isConstrained { return "Low Data Mode is on" }
+            if network.isExpensive { return "on Personal Hotspot" }
+        }
+        if Schedule.isEnabled && !Schedule.isWithinWindow() {
+            return "starts at \(Schedule.timeText(Schedule.start))"
+        }
+        return nil
+    }
+
+    func startNowDespiteHold() {
+        overriddenHold = currentHold
+        applyHold()
+    }
+
+    /// Pauses running downloads when a hold begins and resumes them when it ends.
+    func applyHold() {
+        let current = currentHold
+        if current != lastHold, current != overriddenHold { overriddenHold = nil }
+        lastHold = current
+        if holdReason != nil {
+            for job in jobs where job.canPause {
+                job.autoPaused = true
+                pause(job)
+            }
+        } else {
+            for job in jobs where job.status == .paused && job.autoPaused {
+                job.autoPaused = false
+                job.status = .queued
+            }
+            pump()
+        }
+        updateBadge()
     }
 
     // MARK: Saving between launches
@@ -267,7 +328,7 @@ final class DownloadQueue {
         case .failed: state = "failed"
         case .cancelled: state = "cancelled"
         case .alreadyDownloaded: state = "duplicate"
-        case .paused: state = "paused"
+        case .paused: state = job.autoPaused ? "queued" : "paused"
         default: state = "queued"
         }
         var message: String?
@@ -390,7 +451,10 @@ final class DownloadQueue {
     }
 
     func pump() {
-        guard engine.isReady else { return }
+        guard engine.isReady, holdReason == nil else {
+            updateBadge()
+            return
+        }
         while runningCount < maxConcurrent,
               let next = jobs.last(where: { $0.status == .queued }) {
             start(next)
@@ -409,6 +473,7 @@ final class DownloadQueue {
 
     func resume(_ job: DownloadJob) {
         guard job.status == .paused else { return }
+        job.autoPaused = false
         job.status = .queued
         pump()
     }
@@ -464,6 +529,7 @@ final class DownloadQueue {
     func suspendAllForQuit() {
         for job in jobs where job.isRunning {
             job.stopReason = .pause
+            job.converter?.cancel()
             job.accelerator?.cancel()
             job.process?.interrupt()
         }
@@ -487,13 +553,15 @@ final class DownloadQueue {
         job.completedStreamBytes = 0
         job.currentFormat = nil
         job.galleryFiles = []
+        job.conversionChecked = false
 
         job.activeConnections = nil
 
         try? FileManager.default.createDirectory(at: job.options.folder, withIntermediateDirectories: true)
 
-        // Clips are cut by FFmpeg while downloading, so they skip the accelerator.
-        if job.kind == .video && job.options.connections > 1 && !job.options.isClip {
+        // Clips are cut by FFmpeg while downloading, and speed limits are enforced by
+        // yt-dlp, so both skip the accelerator.
+        if job.kind == .video && job.options.canAccelerate {
             job.acceleratorTask = Task { await self.runAccelerated(job) }
         } else {
             launchProcess(job, infoFile: nil)
@@ -609,6 +677,10 @@ final class DownloadQueue {
     }
 
     private func stop(_ job: DownloadJob) {
+        if let converter = job.converter {
+            converter.cancel()   // convert() then calls finish()
+            return
+        }
         if let accelerator = job.accelerator {
             accelerator.cancel()   // runAccelerated() then calls finish()
             return
@@ -729,6 +801,12 @@ final class DownloadQueue {
             let succeeded = job.kind == .gallery
                 ? (exitStatus == 0 && !job.galleryFiles.isEmpty)
                 : exitStatus == 0
+            if succeeded && job.kind == .video && job.options.usesHEVCConversion(for: job.link),
+               let file = job.fileURL, !job.conversionChecked {
+                job.conversionChecked = true
+                convert(job, file: file)
+                return
+            }
             if succeeded {
                 job.status = .finished
                 job.fraction = 1
@@ -752,6 +830,41 @@ final class DownloadQueue {
             }
         }
         pump()
+    }
+
+    /// Re-encodes VP9/AV1 to HEVC so 4K plays in QuickTime, then finishes the job.
+    private func convert(_ job: DownloadJob, file: URL) {
+        let converter = HEVCConverter(ffmpeg: engine.path(.ffmpeg), ffprobe: engine.path(.ffprobe),
+                                      environment: engine.environment)
+        job.converter = converter
+        job.status = .processing("Checking video…")
+        weak let weakJob = job
+        Task {
+            do {
+                let result = try await converter.convertIfNeeded(file) { fraction in
+                    Task { @MainActor in
+                        guard let job = weakJob, job.converter != nil else { return }
+                        let percent = Int(fraction * 100)
+                        job.status = .processing("Converting for QuickTime… \(percent)%")
+                    }
+                }
+                if let result {
+                    job.fileURL = result
+                    job.log.append("Converted to HEVC for QuickTime.")
+                }
+                job.converter = nil
+                finish(job, exitStatus: 0)
+            } catch is CancellationError {
+                job.converter = nil
+                finish(job, exitStatus: 0)   // stopReason decides: cancelled or paused
+            } catch {
+                // Keep the playable-elsewhere original rather than failing the download.
+                job.log.append(error.localizedDescription)
+                job.converter = nil
+                job.options.convertHighResToHEVC = false
+                finish(job, exitStatus: 0)
+            }
+        }
     }
 
     private func removePartialFiles(of job: DownloadJob) {

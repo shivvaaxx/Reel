@@ -175,6 +175,13 @@ private struct DownloadSettings: View {
     @AppStorage("subtitleLanguage") private var subtitleLanguage = "en"
     @AppStorage("connections") private var connections = 8
     @AppStorage("proxy") private var proxy = ""
+    @AppStorage("hevc4K") private var hevc4K = true
+    @AppStorage("limitRate") private var limitRate = false
+    @AppStorage("rateLimitMB") private var rateLimitMB = 5.0
+    @AppStorage("scheduleEnabled") private var scheduleEnabled = false
+    @AppStorage("scheduleStart") private var scheduleStart = 60
+    @AppStorage("scheduleEnd") private var scheduleEnd = 420
+    @AppStorage("pauseOnCostlyNetwork") private var pauseOnCostlyNetwork = true
 
     var body: some View {
         Form {
@@ -198,7 +205,13 @@ private struct DownloadSettings: View {
             Section {
                 Toggle(isOn: $compatible) {
                     Text("Prefer QuickTime-compatible video")
-                    Text("Downloads H.264 video that plays everywhere on your Mac, iPhone and iPad. Usually limits YouTube to 1080p; turn off for 4K.")
+                    Text("Files play in QuickTime, Photos and on iPhone and iPad.")
+                }
+                if compatible {
+                    Toggle(isOn: $hevc4K) {
+                        Text("Keep 4K by converting to HEVC")
+                        Text("YouTube's 4K is only offered in formats QuickTime can't play. Reel downloads it and converts it with your Mac's video encoder. Off: limit to 1080p H.264.")
+                    }
                 }
                 Toggle(isOn: $embedDetails) {
                     Text("Add artwork, chapters and details")
@@ -209,6 +222,41 @@ private struct DownloadSettings: View {
                     TextField("Subtitle language", text: $subtitleLanguage, prompt: Text("en"))
                 }
             }
+            Section("Speed") {
+                Toggle("Limit download speed", isOn: $limitRate)
+                if limitRate {
+                    LabeledContent("Maximum") {
+                        HStack {
+                            TextField("", value: $rateLimitMB, format: .number.precision(.fractionLength(0...1)))
+                                .frame(width: 60)
+                                .multilineTextAlignment(.trailing)
+                            Text("MB/s")
+                            Stepper("", value: $rateLimitMB, in: 0.5...500, step: 0.5).labelsHidden()
+                        }
+                    }
+                    Text("Limited downloads use a single connection, so the accelerator is off while this is on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section("Schedule") {
+                Toggle(isOn: $scheduleEnabled) {
+                    Text("Only download during set hours")
+                    Text("New and paused downloads wait until the window opens, and pause when it closes.")
+                }
+                if scheduleEnabled {
+                    DatePicker("From", selection: minutes($scheduleStart), displayedComponents: .hourAndMinute)
+                    DatePicker("Until", selection: minutes($scheduleEnd), displayedComponents: .hourAndMinute)
+                }
+                Toggle(isOn: $pauseOnCostlyNetwork) {
+                    Text("Wait on Personal Hotspot or Low Data Mode")
+                    Text("Saves your mobile data. Downloads continue when you're back on regular Wi-Fi.")
+                }
+            }
+            .onChange(of: scheduleEnabled) { Shared.queue.applyHold() }
+            .onChange(of: scheduleStart) { Shared.queue.applyHold() }
+            .onChange(of: scheduleEnd) { Shared.queue.applyHold() }
+            .onChange(of: pauseOnCostlyNetwork) { Shared.queue.applyHold() }
             Section {
                 TextField("Proxy", text: $proxy, prompt: Text("None"))
             } footer: {
@@ -218,6 +266,11 @@ private struct DownloadSettings: View {
         }
         .formStyle(.grouped)
     }
+}
+
+private func minutes(_ value: Binding<Int>) -> Binding<Date> {
+    Binding(get: { Schedule.date(fromMinutes: value.wrappedValue) },
+            set: { value.wrappedValue = Schedule.minutes(from: $0) })
 }
 
 private struct AccountSettings: View {

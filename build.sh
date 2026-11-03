@@ -17,5 +17,21 @@ if [[ ! -f build/AppIcon.icns ]]; then
 fi
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-codesign --force --sign - "$APP"
+# Sign with a stable identity so macOS remembers Reel's permissions (Downloads, Full Disk
+# Access…) across rebuilds and updates. Set REEL_SIGN_IDENTITY to choose one; otherwise the
+# first "Developer ID Application" or "Apple Development" certificate is used, falling back
+# to ad-hoc signing (fine for building it yourself, but macOS will re-ask for permissions).
+IDENTITY="${REEL_SIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+  for kind in "Developer ID Application" "Apple Development"; do
+    IDENTITY=$(security find-identity -v -p codesigning | grep "\"$kind" | head -1 | awk '{print $2}' || true)
+    [[ -n "$IDENTITY" ]] && break
+  done
+fi
+if [[ -n "$IDENTITY" ]]; then
+  codesign --force --timestamp=none --sign "$IDENTITY" "$APP"
+else
+  echo "No signing certificate found; signing ad hoc."
+  codesign --force --sign - "$APP"
+fi
 echo "Built $APP"
