@@ -1,0 +1,513 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1504C727A37902CC99993C5F /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 85056A805E9A5EA457A7AAA7 /* manifest.json */; };
+		19399ADB823D03C92224B0B2 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 33F3CF8BA0A57CF02989A777 /* background.js */; };
+		2D781AEB2AFC4A9C1729FCA6 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 079B274BE43955D31F99927F /* SafariWebExtensionHandler.swift */; };
+		4C7754B2CEA4C19B55BD1606 /* ReelLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FBAFF71BEFAB2B5B0389B2 /* ReelLink.swift */; };
+		8758112C4F4B3BD3464E7EDD /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCABF16EA7535C94262AA84 /* ShareViewController.swift */; };
+		90CCDB44ABD26AFE4931467E /* ReelLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FBAFF71BEFAB2B5B0389B2 /* ReelLink.swift */; };
+		953904D9F5CE81C9EDEAAF95 /* images in Resources */ = {isa = PBXBuildFile; fileRef = 5ED85BB2D669BF06691AF19C /* images */; };
+		CF7CD31CC3607E1291782D4F /* ReelIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C9C8727772A2064A6F1F0A /* ReelIntents.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		079B274BE43955D31F99927F /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		0A6DA6877131BA9BDF1B37D0 /* ReelShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ReelShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		12C9C8727772A2064A6F1F0A /* ReelIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelIntents.swift; sourceTree = "<group>"; };
+		21FBAFF71BEFAB2B5B0389B2 /* ReelLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelLink.swift; sourceTree = "<group>"; };
+		2FB71882920099C43330390A /* ReelIntents.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = ReelIntents.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		33F3CF8BA0A57CF02989A777 /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = background.js; sourceTree = "<group>"; };
+		5ED85BB2D669BF06691AF19C /* images */ = {isa = PBXFileReference; lastKnownFileType = folder; name = images; path = Safari/Resources/images; sourceTree = SOURCE_ROOT; };
+		612FD921108AC4228E70D732 /* ReelSafari.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ReelSafari.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		85056A805E9A5EA457A7AAA7 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = manifest.json; sourceTree = "<group>"; };
+		C7F13713EFDC7D4050BB2AB8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D130972109961CFEF0B68C70 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DCDF5AA2C3448EEC187E8A55 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FFCABF16EA7535C94262AA84 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0A6206793A4877475909F541 /* Safari */ = {
+			isa = PBXGroup;
+			children = (
+				C7F13713EFDC7D4050BB2AB8 /* Info.plist */,
+				079B274BE43955D31F99927F /* SafariWebExtensionHandler.swift */,
+				8C4496C4C0DC61BDD7BEBEEE /* Resources */,
+			);
+			path = Safari;
+			sourceTree = "<group>";
+		};
+		29640A9D9C223CD59ACD07F5 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				21FBAFF71BEFAB2B5B0389B2 /* ReelLink.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		615DC60363BC9E06225A5B1D /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				DCDF5AA2C3448EEC187E8A55 /* Info.plist */,
+				12C9C8727772A2064A6F1F0A /* ReelIntents.swift */,
+			);
+			path = Intents;
+			sourceTree = "<group>";
+		};
+		8C4496C4C0DC61BDD7BEBEEE /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				33F3CF8BA0A57CF02989A777 /* background.js */,
+				5ED85BB2D669BF06691AF19C /* images */,
+				85056A805E9A5EA457A7AAA7 /* manifest.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		96FBE956C40AFF3EBE91C018 = {
+			isa = PBXGroup;
+			children = (
+				615DC60363BC9E06225A5B1D /* Intents */,
+				0A6206793A4877475909F541 /* Safari */,
+				A60CBA3469C5C1C1B287C1ED /* Share */,
+				29640A9D9C223CD59ACD07F5 /* Shared */,
+				EFC68E406D62E3D00E3210E8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A60CBA3469C5C1C1B287C1ED /* Share */ = {
+			isa = PBXGroup;
+			children = (
+				D130972109961CFEF0B68C70 /* Info.plist */,
+				FFCABF16EA7535C94262AA84 /* ShareViewController.swift */,
+			);
+			path = Share;
+			sourceTree = "<group>";
+		};
+		EFC68E406D62E3D00E3210E8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2FB71882920099C43330390A /* ReelIntents.appex */,
+				612FD921108AC4228E70D732 /* ReelSafari.appex */,
+				0A6DA6877131BA9BDF1B37D0 /* ReelShare.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4545CC406267A04211ACEE51 /* ReelSafari */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE757EC78BC20678C71D07CC /* Build configuration list for PBXNativeTarget "ReelSafari" */;
+			buildPhases = (
+				139ABDBB3AE99F096DCFD2BC /* Sources */,
+				DD5C35164D7F6A9F708FB53A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ReelSafari;
+			packageProductDependencies = (
+			);
+			productName = ReelSafari;
+			productReference = 612FD921108AC4228E70D732 /* ReelSafari.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8727D09ADE66D8EDEEB42B5A /* ReelIntents */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9E53ACC2D48A814524A89C0D /* Build configuration list for PBXNativeTarget "ReelIntents" */;
+			buildPhases = (
+				51D7275E887EE7345AADE7A0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ReelIntents;
+			packageProductDependencies = (
+			);
+			productName = ReelIntents;
+			productReference = 2FB71882920099C43330390A /* ReelIntents.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
+		E184D022FAAD4FBC2913F801 /* ReelShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 493525757A5E75E901C6FFA0 /* Build configuration list for PBXNativeTarget "ReelShare" */;
+			buildPhases = (
+				F54580AA7EF9722E08010097 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ReelShare;
+			packageProductDependencies = (
+			);
+			productName = ReelShare;
+			productReference = 0A6DA6877131BA9BDF1B37D0 /* ReelShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5D84D4CDF5765AAAA0C9D905 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					4545CC406267A04211ACEE51 = {
+						DevelopmentTeam = 32DYANNXSC;
+						ProvisioningStyle = Automatic;
+					};
+					8727D09ADE66D8EDEEB42B5A = {
+						DevelopmentTeam = 32DYANNXSC;
+						ProvisioningStyle = Automatic;
+					};
+					E184D022FAAD4FBC2913F801 = {
+						DevelopmentTeam = 32DYANNXSC;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 31E4C32E64458F55EC3C9D3A /* Build configuration list for PBXProject "ReelExtensions" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 96FBE956C40AFF3EBE91C018;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = EFC68E406D62E3D00E3210E8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E184D022FAAD4FBC2913F801 /* ReelShare */,
+				4545CC406267A04211ACEE51 /* ReelSafari */,
+				8727D09ADE66D8EDEEB42B5A /* ReelIntents */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DD5C35164D7F6A9F708FB53A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				19399ADB823D03C92224B0B2 /* background.js in Resources */,
+				953904D9F5CE81C9EDEAAF95 /* images in Resources */,
+				1504C727A37902CC99993C5F /* manifest.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		139ABDBB3AE99F096DCFD2BC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				90CCDB44ABD26AFE4931467E /* ReelLink.swift in Sources */,
+				2D781AEB2AFC4A9C1729FCA6 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		51D7275E887EE7345AADE7A0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF7CD31CC3607E1291782D4F /* ReelIntents.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F54580AA7EF9722E08010097 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4C7754B2CEA4C19B55BD1606 /* ReelLink.swift in Sources */,
+				8758112C4F4B3BD3464E7EDD /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0B14823511E1AEC05D3E69DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Safari/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.safari;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		45881DA10660CDD015207DC3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Share/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.share;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		4B4107000600B1A01DCBC940 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = Sandbox.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 32DYANNXSC;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		50CB7990141070E6634EC487 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = Sandbox.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 32DYANNXSC;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		7E0654970434EC6EE1392E46 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Intents/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.intents;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		8A76C2AEE3FB98B9CD4A5542 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Safari/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.safari;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		CE63641D2F535E121F5A29AD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Share/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.share;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D266DEE93FF4CB56B299D9AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Intents/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.shiva.reel.intents;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		31E4C32E64458F55EC3C9D3A /* Build configuration list for PBXProject "ReelExtensions" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4B4107000600B1A01DCBC940 /* Debug */,
+				50CB7990141070E6634EC487 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		493525757A5E75E901C6FFA0 /* Build configuration list for PBXNativeTarget "ReelShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE63641D2F535E121F5A29AD /* Debug */,
+				45881DA10660CDD015207DC3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9E53ACC2D48A814524A89C0D /* Build configuration list for PBXNativeTarget "ReelIntents" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D266DEE93FF4CB56B299D9AA /* Debug */,
+				7E0654970434EC6EE1392E46 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CE757EC78BC20678C71D07CC /* Build configuration list for PBXNativeTarget "ReelSafari" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B14823511E1AEC05D3E69DA /* Debug */,
+				8A76C2AEE3FB98B9CD4A5542 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5D84D4CDF5765AAAA0C9D905 /* Project object */;
+}

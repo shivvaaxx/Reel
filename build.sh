@@ -45,7 +45,25 @@ if [[ -z "$IDENTITY" ]]; then
   echo "No signing certificate found; signing ad hoc."
   IDENTITY="-"
 fi
-# Inside out: Sparkle's helpers, the framework, then the app.
+# App extensions (Share menu, Safari button, Shortcuts actions) need Xcode and a real signing
+# certificate, because macOS only loads signed, sandboxed extensions. Skipped otherwise.
+if [[ "$IDENTITY" != "-" ]] && command -v xcodebuild >/dev/null; then
+  VERSION_STRING=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+  BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+  if command -v xcodegen >/dev/null; then xcodegen generate --quiet --spec Extensions/project.yml; fi
+  xcodebuild -quiet -project Extensions/ReelExtensions.xcodeproj -alltargets -configuration Release \
+    -allowProvisioningUpdates SYMROOT="$PWD/build/ext" \
+    MARKETING_VERSION="$VERSION_STRING" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" build
+  mkdir -p "$APP/Contents/PlugIns" "$APP/Contents/Extensions"
+  ditto build/ext/Release/ReelShare.appex "$APP/Contents/PlugIns/ReelShare.appex"
+  ditto build/ext/Release/ReelSafari.appex "$APP/Contents/PlugIns/ReelSafari.appex"
+  ditto build/ext/Release/ReelIntents.appex "$APP/Contents/Extensions/ReelIntents.appex"
+else
+  echo "Skipping app extensions (needs Xcode and a signing certificate)."
+fi
+
+# Inside out: Sparkle's helpers, the framework, then the app. Extensions keep the
+# signatures (and sandbox entitlements) Xcode gave them.
 sign() { codesign --force --timestamp=none --sign "$IDENTITY" "$@"; }
 sign "$FRAMEWORK/Versions/B/Autoupdate"
 sign "$FRAMEWORK/Versions/B/Updater.app"

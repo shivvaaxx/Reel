@@ -1,0 +1,58 @@
+# Reel's app extensions, built with Xcode and embedded into Reel.app by build.sh.
+# Generate with: xcodegen generate --spec Extensions/project.yml
+name: ReelExtensions
+options:
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: 32DYANNXSC
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_ENTITLEMENTS: Sandbox.entitlements
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  ReelShare:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Share
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shiva.reel.share
+        INFOPLIST_FILE: Share/Info.plist
+  ReelSafari:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Safari
+        excludes: [Resources]
+      # manifest.json and background.js must sit at the top of the extension's Resources.
+      - path: Safari/Resources/manifest.json
+        buildPhase: resources
+      - path: Safari/Resources/background.js
+        buildPhase: resources
+      - path: Safari/Resources/images
+        type: folder
+        buildPhase: resources
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shiva.reel.safari
+        INFOPLIST_FILE: Safari/Info.plist
+  ReelIntents:
+    type: extensionkit-extension
+    platform: macOS
+    sources:
+      - Intents
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shiva.reel.intents
+        INFOPLIST_FILE: Intents/Info.plist
