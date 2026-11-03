@@ -133,6 +133,8 @@ struct ReelApp: App {
                     .keyboardShortcut("k")
             }
             CommandGroup(replacing: .help) {
+                Button("What's New in Reel") { WhatsNew.show() }
+                Divider()
                 Button("Reel on GitHub") { NSWorkspace.shared.open(Support.repository) }
                 Button("Report a Problem…") {
                     NSWorkspace.shared.open(Support.repository.appendingPathComponent("issues/new"))
@@ -163,6 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Set before the first window appears so a hidden Dock icon never flashes.
         MainActor.assumeIsolated {
             _ = NSApp.setActivationPolicy(Shared.showInDock ? .regular : .accessory)
+            WhatsNew.captureInstallState()
         }
     }
 
@@ -173,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         MainActor.assumeIsolated {
             _ = Updater.shared   // starts Sparkle's scheduled checks
             Shared.applyPresence()
+            // After an update, show this version's notes once (after the main window settles).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { WhatsNew.showIfUpdated() }
             // The window's .task normally starts setup; when launching menu-bar-only it may not exist.
             Task { @MainActor in
                 await Shared.engine.prepare()

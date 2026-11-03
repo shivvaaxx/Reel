@@ -27,7 +27,8 @@ Reel started as a replacement for [MacYTDL](https://github.com/section83/MacYTDL
 ### Library and subscriptions
 - **Library (⌘2):** everything you've downloaded, searchable and filterable by site. Play it, reveal it in Finder, open the original page or download it again.
 - **Duplicate detection:** Reel recognises the same video behind different links (youtu.be, Shorts, links with share-tracking parameters) and asks before downloading it twice.
-- **Subscriptions (⌘3):** follow a YouTube channel or playlist, and Reel downloads new uploads automatically at the quality you choose.
+- **Subscriptions (⌘3):** follow a YouTube channel or playlist, and Reel downloads new videos automatically at the quality you choose. Reel checks every few hours (you choose how often). Videos that were already there are skipped unless you ask for them, either with "Plus everything already there" when subscribing or **Download Existing** later.
+- **A folder per subscription:** each subscription can save to its own folder. Before downloading, Reel looks at what's in that folder, including videos you moved there yourself, and only fetches what's missing. Reel recognises its files after they're moved or renamed, because each one remembers where it came from (shown as "Where from" in Finder's Get Info).
 
 ### Menu bar mode
 - **Drop links on the icon.** Drag a link from any app onto Reel's menu bar icon and it downloads at your default quality, with no window and no switching apps. A checkmark confirms the drop landed.
@@ -83,7 +84,7 @@ Instagram, sometimes TikTok, and age-restricted YouTube videos only show to sign
 > Safari keeps its sign-ins private, so using Safari means giving Reel **Full Disk Access** (System Settings › Privacy & Security). Chrome and other browsers instead show a one-time Keychain prompt; choose **Always Allow**.
 
 ### Always up to date
-- **Reel updates itself.** It checks for new versions daily (using [Sparkle](https://sparkle-project.org)) and shows you what's new before installing. Every update is verified against Reel's signing key. You can turn this off, or check by hand with **Reel › Check for Updates…**.
+- **Reel updates itself.** It checks for new versions daily (using [Sparkle](https://sparkle-project.org)) and shows you what's new before installing, then once more the first time you open the new version (also in **Help › What's New in Reel**). Every update is verified against Reel's signing key. You can turn this off, or check by hand with **Reel › Check for Updates…**.
 - **So do its download tools.** Sites like YouTube and Instagram change all the time, and an out-of-date downloader is the most common reason downloads stop working. On first launch Reel downloads **private copies** of everything it needs. Nothing is installed system-wide, and Homebrew isn't required. yt-dlp and gallery-dl are checked for updates daily, and FFmpeg, Deno and uv monthly. **Settings › Engine** lists every tool's version and lets you update or reinstall them.
 
 | Tool | What Reel uses it for | Source |
