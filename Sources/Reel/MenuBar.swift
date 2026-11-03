@@ -15,6 +15,7 @@ final class MenuPanelWindow: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
+        contentView?.wantsLayer = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         animationBehavior = .utilityWindow
@@ -69,7 +70,11 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
                 .environment(Shared.queue)
         ))
         hosting.sizingOptions = []
-        let panel = MenuPanelWindow(content: hosting)
+        // The window itself is the rounded glass shape, so no rectangular edge or shadow shows.
+        let glass = NSGlassEffectView()
+        glass.cornerRadius = MenuPanel.cornerRadius
+        glass.contentView = hosting
+        let panel = MenuPanelWindow(content: glass)
         hostingView = hosting
         NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { _ in
             MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
@@ -134,7 +139,10 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
         x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
         let y = icon.minY - size.height - 6
         let frame = NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
-        if panel.frame != frame { panel.setFrame(frame, display: true) }
+        if panel.frame != frame {
+            panel.setFrame(frame, display: true)
+            panel.invalidateShadow()   // recompute the shadow from the rounded shape
+        }
     }
 
     // MARK: Icon
@@ -238,6 +246,8 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
 /// The panel under the menu bar icon.
 struct MenuPanel: View {
+    static let cornerRadius: CGFloat = 22
+
     @Environment(DownloadQueue.self) private var queue
     @Environment(Engine.self) private var engine
     @State private var link = ""
@@ -352,10 +362,9 @@ struct MenuPanel: View {
         }
         .padding(14)
         .frame(width: 370)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
         .overlay {
             if dropTargeted {
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
                     .strokeBorder(Color.accentColor, lineWidth: 2.5)
                     .allowsHitTesting(false)
             }
