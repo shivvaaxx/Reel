@@ -9,6 +9,8 @@ enum EngineError: LocalizedError {
     case lookupFailed(String)
     case noVideo
     case galleryFailed(String)
+    /// Blocked in this country; carries the readable message and where it is available.
+    case geoBlocked(String, [String])
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +21,7 @@ enum EngineError: LocalizedError {
         case .lookupFailed(let message): message
         case .noVideo: "This post has no video."
         case .galleryFailed(let detail): "Couldn't set up photo downloads. \(detail)"
+        case .geoBlocked(let message, _): message
         }
     }
 }
@@ -150,7 +153,7 @@ final class Engine {
     var baseArguments: [String] {
         ["--ffmpeg-location", binDir.path,
          "--js-runtimes", "deno:" + path(.deno).path,
-         "--no-update"]
+         "--no-update"] + Prefs.proxyArguments
     }
 
     // MARK: Setup
@@ -188,8 +191,8 @@ final class Engine {
                         try await installGallery(fresh: !FileManager.default.isExecutableFile(atPath: galleryDir.appendingPathComponent("bin/python").path))
                     }
                 } else if let source = component.source {
-                    let file = try await Downloader.fetch(source) { fraction in
-                        Task { @MainActor [weak self] in
+                    let file = try await Downloader.fetch(source) { [weak self] fraction in
+                        Task { @MainActor in
                             guard let self, blocking else { return }
                             self.componentProgress = fraction
                         }
@@ -346,6 +349,9 @@ final class Engine {
             if lower.contains("there is no video in this post") || lower.contains("no video formats found") {
                 throw EngineError.noVideo
             }
+            if let countries = Engine.geoRestriction(in: result.stderr) {
+                throw EngineError.geoBlocked(Engine.readableError(result.stderr, fallback: ""), countries)
+            }
             throw EngineError.lookupFailed(Engine.readableError(result.stderr, fallback: "Reel couldn't find a video at that link."))
         }
         return MediaInfo(json: json, link: link)
@@ -355,8 +361,37 @@ final class Engine {
         text.split(separator: "\n").last.map(String.init) ?? ""
     }
 
+    /// If the output reports a geo-block, the countries the video *is* available in
+    /// (empty when the site doesn't say). nil when it isn't a geo-block.
+    nonisolated static func geoRestriction(in output: String) -> [String]? {
+        let lower = output.lowercased()
+        guard lower.contains("geo restriction") || lower.contains("available in your country")
+                || lower.contains("not available from your location") || lower.contains("in your region") else { return nil }
+        let marker = "This video is available in "
+        guard let line = output.split(separator: "\n").first(where: { $0.contains(marker) }),
+              let range = line.range(of: marker) else { return [] }
+        var list = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        if list.hasSuffix(".") { list.removeLast() }
+        return list.components(separatedBy: ", ").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// The person's own country name, for "not available in Singapore".
+    nonisolated static var currentCountryName: String? {
+        guard let code = Locale.current.region?.identifier else { return nil }
+        return Locale.current.localizedString(forRegionCode: code)
+    }
+
     /// Turns yt-dlp's or gallery-dl's last error line into something a person can read.
-    static func readableError(_ output: String, fallback: String) -> String {
+    nonisolated static func readableError(_ output: String, fallback: String) -> String {
+        if let countries = geoRestriction(in: output) {
+            let here = currentCountryName.map { "in \($0)" } ?? "in your country"
+            guard !countries.isEmpty else {
+                return "This video isn't available \(here). A VPN or a proxy (Settings › Downloads) may help."
+            }
+            let shown = countries.count <= 4 ? countries.joined(separator: ", ")
+                : countries.prefix(3).joined(separator: ", ") + " and \(countries.count - 3) more"
+            return "Not available \(here). It's available in \(shown)."
+        }
         let lower = output.lowercased()
         if lower.contains("operation not permitted") && lower.contains("cookies") {
             return "Reel needs Full Disk Access to use Safari's sign-in. Turn it on in System Settings › Privacy & Security › Full Disk Access."

@@ -214,10 +214,13 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
     // MARK: Dropping links
 
+    // AppKit delivers drag events on the main thread.
     nonisolated func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let links = Self.links(from: sender.draggingPasteboard)
-        MainActor.assumeIsolated { item?.button?.highlight(!links.isEmpty) }
-        return links.isEmpty ? [] : .copy
+        MainActor.assumeIsolated {
+            let links = Self.links(from: sender.draggingPasteboard)
+            item?.button?.highlight(!links.isEmpty)
+            return links.isEmpty ? [] : .copy
+        }
     }
 
     nonisolated func draggingExited(_ sender: NSDraggingInfo?) {
@@ -227,8 +230,8 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
     nonisolated func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { true }
 
     nonisolated func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let links = Self.links(from: sender.draggingPasteboard)
-        return MainActor.assumeIsolated {
+        MainActor.assumeIsolated {
+            let links = Self.links(from: sender.draggingPasteboard)
             item?.button?.highlight(false)
             guard !links.isEmpty else { return false }
             links.forEach { Shared.queue.quickAdd($0) }

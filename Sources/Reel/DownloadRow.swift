@@ -5,6 +5,7 @@ struct DownloadRow: View {
     @Environment(DownloadQueue.self) private var queue
     let job: DownloadJob
     @State private var showingLog = false
+    @State private var showingCountries = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -32,11 +33,19 @@ struct DownloadRow: View {
                     }
                 }
 
-                Text(job.statusLine)
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(job.isFailed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                    .lineLimit(2)
-                    .contentTransition(.numericText())
+                HStack(spacing: 6) {
+                    Text(job.statusLine)
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(job.isFailed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                        .lineLimit(2)
+                        .contentTransition(.numericText())
+                    if let countries = job.availableIn, countries.count > 4 {
+                        Button("All \(countries.count) Countries…") { showingCountries = true }
+                            .buttonStyle(.link)
+                            .font(.callout)
+                            .popover(isPresented: $showingCountries) { CountryList(countries: countries) }
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -118,6 +127,30 @@ struct JobMenu: View {
         }
         Divider()
         Button("Remove from List", role: .destructive) { withAnimation { queue.remove(job) } }
+    }
+}
+
+/// Where a geo-blocked video can be watched, from the site's own list.
+struct CountryList: View {
+    let countries: [String]
+    @State private var search = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Available in \(countries.count) countries", systemImage: "globe")
+                .font(.headline)
+            TextField("Search", text: $search)
+                .textFieldStyle(.roundedBorder)
+            List(countries.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) }, id: \.self) {
+                Text($0)
+            }
+            .listStyle(.plain)
+            Text("Use a VPN located in one of these countries, or set a proxy in Settings › Downloads, then try again.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .frame(width: 300, height: 380)
     }
 }
 
