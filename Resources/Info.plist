@@ -28,6 +28,10 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Reel adds the photos and videos you download to your Photos library, if you turn this on in Settings.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Reel adds audio you download to the Music app, if you turn this on in Settings.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Built on yt-dlp, FFmpeg and Deno.</string>
 </dict>

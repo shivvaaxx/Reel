@@ -9,7 +9,7 @@ struct ContentView: View {
     @AppStorage("suggestClipboard") private var suggestClipboard = true
     @Environment(\.openWindow) private var openWindow
 
-    enum Section: String { case downloads, library }
+    enum Section: String { case downloads, library, subscriptions }
 
     enum Lookup {
         case idle, loading, loaded(MediaInfo), gallery(String), failed(String)
@@ -39,6 +39,7 @@ struct ContentView: View {
             switch section {
             case .downloads: downloadsPane
             case .library: LibraryView()
+            case .subscriptions: SubscriptionsView()
             }
         }
         .frame(minWidth: 640, minHeight: 540)
@@ -50,6 +51,7 @@ struct ContentView: View {
                 Picker("View", selection: $section) {
                     Text("Downloads").tag(Section.downloads)
                     Text("Library").tag(Section.library)
+                    Text("Subscriptions").tag(Section.subscriptions)
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
@@ -124,6 +126,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .reelShowLibrary)) { _ in
             section = .library
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .reelShowSubscriptions)) { _ in
+            section = .subscriptions
         }
         .onReceive(NotificationCenter.default.publisher(for: .reelDownloadClipboard)) { _ in
             if let copied = Clipboard.readLink() {

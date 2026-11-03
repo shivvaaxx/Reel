@@ -182,6 +182,8 @@ private struct DownloadSettings: View {
     @AppStorage("scheduleStart") private var scheduleStart = 60
     @AppStorage("scheduleEnd") private var scheduleEnd = 420
     @AppStorage("pauseOnCostlyNetwork") private var pauseOnCostlyNetwork = true
+    @AppStorage("photosMode") private var photosMode = Integrations.PhotosMode.off.rawValue
+    @AppStorage("addToMusic") private var addToMusic = false
 
     var body: some View {
         Form {
@@ -221,6 +223,23 @@ private struct DownloadSettings: View {
                 if subtitles {
                     TextField("Subtitle language", text: $subtitleLanguage, prompt: Text("en"))
                 }
+            }
+            Section {
+                Picker(selection: $photosMode) {
+                    ForEach(Integrations.PhotosMode.allCases) { Text($0.label).tag($0.rawValue) }
+                } label: {
+                    Text("Add to Photos")
+                    Text("Copies downloaded photos (and optionally playable videos) into your Photos library.")
+                }
+                Toggle(isOn: $addToMusic) {
+                    Text("Add audio downloads to Music")
+                    Text("Audio-only downloads appear in your Music library with their artwork.")
+                }
+            } header: {
+                Text("After Downloading")
+            } footer: {
+                Text("Files are always kept in your downloads folder too.")
+                    .foregroundStyle(.secondary)
             }
             Section("Speed") {
                 Toggle("Limit download speed", isOn: $limitRate)

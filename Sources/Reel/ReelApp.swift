@@ -7,6 +7,7 @@ enum Shared {
     static let engine = Engine()
     static let library = Library()
     static let queue = DownloadQueue(engine: engine, library: library)
+    static let subscriptions = Subscriptions(engine: engine, queue: queue)
     static var openWindowAction: OpenWindowAction?
 
     static var mainWindow: NSWindow? {
@@ -47,6 +48,7 @@ extension Notification.Name {
     static let reelDownloadClipboard = Notification.Name("reelDownloadClipboard")
     static let reelFocusLink = Notification.Name("reelFocusLink")
     static let reelShowLibrary = Notification.Name("reelShowLibrary")
+    static let reelShowSubscriptions = Notification.Name("reelShowSubscriptions")
 }
 
 /// Tags the main window so AppKit code (the menu bar panel) can find it.
@@ -70,6 +72,7 @@ struct ReelApp: App {
     @State private var engine = Shared.engine
     @State private var queue = Shared.queue
     @State private var library = Shared.library
+    @State private var subscriptions = Shared.subscriptions
 
     var body: some Scene {
         Window("Reel", id: "main") {
@@ -77,6 +80,7 @@ struct ReelApp: App {
                 .environment(engine)
                 .environment(queue)
                 .environment(library)
+                .environment(subscriptions)
                 .task {
                     await engine.prepare()
                     queue.pump()
@@ -108,6 +112,11 @@ struct ReelApp: App {
                     NotificationCenter.default.post(name: .reelShowLibrary, object: nil)
                 }
                 .keyboardShortcut("2")
+                Button("Subscriptions") {
+                    Shared.openMainWindow()
+                    NotificationCenter.default.post(name: .reelShowSubscriptions, object: nil)
+                }
+                .keyboardShortcut("3")
                 Divider()
             }
             CommandMenu("Downloads") {
@@ -154,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             Task { @MainActor in
                 await Shared.engine.prepare()
                 Shared.queue.pump()
+                Shared.subscriptions.checkDue()
             }
             // `open -a Reel --args --download <link> [<link>…]` queues links at launch.
             let args = CommandLine.arguments
