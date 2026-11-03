@@ -15,6 +15,10 @@
   <a href="../../releases/latest"><b>Download the latest version</b></a> · macOS 26 · Apple silicon · Free and open source
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/shivvaaxx"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Reel on Ko-fi"></a>
+</p>
+
 Reel is a SwiftUI app for macOS that puts a calm, Apple-style interface on top of the best open-source download tools: [yt-dlp](https://github.com/yt-dlp/yt-dlp) for video and [gallery-dl](https://github.com/mikf/gallery-dl) for photos. Paste a link, press Return, and you're done. It lives in your menu bar, your Share menu, Safari and Shortcuts too, so you can send a link to Reel from wherever you are and keep browsing.
 
 Reel started as a replacement for [MacYTDL](https://github.com/section83/MacYTDL). It keeps what made that app useful and rethinks everything else: one window instead of chains of dialogs, live previews, a Safari-style downloads list, and download tools that keep themselves up to date so things don't quietly break.
