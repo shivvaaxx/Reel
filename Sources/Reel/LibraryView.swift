@@ -160,16 +160,16 @@ private struct LibraryRow: View {
             }
             Spacer()
             if item.isAvailable {
-                HStack(spacing: 4) {
+                HStack(spacing: 10) {
                     Button("Show in Finder", systemImage: "magnifyingglass") { item.reveal() }
                         .help("Show in Finder")
                     Button("Move to Trash", systemImage: "trash", action: trash)
                         .help("Move to Trash")
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .imageScale(.large)
-                .foregroundStyle(.secondary)
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
             }
         }
         .padding(.vertical, 4)
