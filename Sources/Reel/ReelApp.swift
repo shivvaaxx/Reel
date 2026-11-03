@@ -119,6 +119,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 await Shared.engine.prepare()
                 Shared.queue.pump()
             }
+            // `open -a Reel --args --download <link> [<link>…]` queues links at launch.
+            let args = CommandLine.arguments
+            if let flag = args.firstIndex(of: "--download") {
+                for link in args[(flag + 1)...] where link.hasPrefix("http") {
+                    Shared.queue.quickAdd(link)
+                }
+            }
         }
     }
 

@@ -29,6 +29,15 @@ Reel started as a replacement for [MacYTDL](https://github.com/section83/MacYTDL
 - **A panel for everything else.** Click the icon to paste a link, see each download's progress, pause, cancel, retry, or show the file in Finder.
 - **Run Reel entirely from the menu bar.** Turn off the Dock icon in Settings and Reel becomes a menu bar app. (Reel won't let you hide both the Dock and menu bar icons, so it can never become unreachable.)
 
+### Accelerated, multi-connection downloads
+Like a download manager such as Folx, Reel splits each video into 8 MB segments and downloads them over several connections at once. This makes the biggest difference on YouTube, which limits each connection's speed. In testing, a 4K YouTube video downloaded at about **50 MB/s with 8 connections**, against about 13 MB/s over one.
+
+- **How it works:** yt-dlp chooses the streams. Reel's own Swift downloader fetches their segments in parallel, writing each straight into place. yt-dlp then merges the streams and adds artwork as usual.
+- **Resumable:** finished segments are recorded in a small ledger, so pausing or quitting never throws work away.
+- **Streaming formats** (HLS/DASH) download their fragments in parallel too.
+- **Safe fallback:** if a site doesn't allow segmented downloads, Reel quietly uses a normal single-connection download instead.
+- Choose **Off, 4, 8 or 16 connections** in Settings › Downloads. 8 is the default.
+
 ### A downloads list like Safari's
 - One progress bar per download. It stays accurate even when video and audio download as separate streams and get merged.
 - Size, speed and time remaining as each download runs, then plain-English steps afterwards: "Merging video and audio…", "Adding artwork…".
@@ -69,7 +78,7 @@ Everything lives in `~/Library/Application Support/Reel/`. Delete that folder an
 
 ### Settings
 - **General:** menu bar icon, Dock icon, download folder, how many downloads run at once, notifications, copied-link suggestions.
-- **Downloads:** default quality, audio format, QuickTime compatibility, embedded artwork and details, subtitles and their language.
+- **Downloads:** default quality, accelerated connections, audio format, QuickTime compatibility, embedded artwork and details, subtitles and their language.
 - **Accounts:** which browser's sign-in to use for Instagram and TikTok.
 - **Engine:** tool versions, automatic updates, Update Now, Reinstall All.
 
@@ -83,6 +92,14 @@ Everything lives in `~/Library/Application Support/Reel/`. Delete that folder an
 2. Open it and drag **Reel** into **Applications**.
 3. Open Reel. The first time, macOS will say it can't verify the developer, because Reel isn't notarized by Apple. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once.
 4. Reel takes a few seconds to download its tools, and then it's ready.
+
+## Scripting
+
+Queue downloads from Terminal, Shortcuts or a script:
+
+```sh
+open -a Reel --args --download "https://www.youtube.com/watch?v=…" "https://www.tiktok.com/@…/video/…"
+```
 
 ## Build from source
 
@@ -105,6 +122,7 @@ The project is a plain Swift package, with no Xcode project to maintain.
 | `DownloadRow.swift` | Download rows, controls and context menus |
 | `MenuBar.swift` | Menu bar icon, link drops, progress ring and panel |
 | `DownloadQueue.swift` | Queue, running yt-dlp/gallery-dl, progress parsing |
+| `Accelerator.swift` | Multi-connection segmented downloader and its download plan |
 | `Engine.swift` | Installing, locating and updating the tools; link lookups |
 | `Models.swift` | Settings, quality options, download arguments, site routing |
 | `SetupAndSettings.swift` | First-run setup screen and the Settings window |

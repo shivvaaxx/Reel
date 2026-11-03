@@ -44,6 +44,8 @@ struct DownloadOptions {
     var embedDetails: Bool
     var subtitles: Bool
     var subtitleLanguage: String
+    /// Simultaneous connections per download (1 = accelerator off).
+    var connections: Int
 
     static func current(quality: Quality) -> DownloadOptions {
         let d = UserDefaults.standard
@@ -54,7 +56,8 @@ struct DownloadOptions {
             compatible: d.object(forKey: "compatible") as? Bool ?? true,
             embedDetails: d.object(forKey: "embedDetails") as? Bool ?? true,
             subtitles: d.bool(forKey: "subtitles"),
-            subtitleLanguage: d.string(forKey: "subtitleLanguage") ?? "en"
+            subtitleLanguage: d.string(forKey: "subtitleLanguage") ?? "en",
+            connections: d.object(forKey: "connections") as? Int ?? 8
         )
     }
 
@@ -69,11 +72,11 @@ struct DownloadOptions {
         return args
     }
 
-    /// yt-dlp arguments for videos.
-    func videoArguments(for link: String) -> [String] {
+    /// yt-dlp arguments for a full download. With `infoFile`, yt-dlp resumes from a plan the
+    /// accelerator already fetched, finding the streams on disk and only merging/tagging.
+    func videoArguments(for link: String, infoFile: URL? = nil) -> [String] {
         var args = [
-            "--newline", "--no-colors", "--progress", "--no-simulate",
-            "--no-playlist", "--no-mtime",
+            "--newline", "--no-colors", "--progress", "--no-simulate", "--no-mtime",
             "--progress-template", "download:@@P %(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|%(info.format_id)s",
             "--progress-template", "postprocess:@@PP %(progress.postprocessor)s",
             "--print", "before_dl:@@T %(title)s",
@@ -81,9 +84,30 @@ struct DownloadOptions {
             "--print", "before_dl:@@I %(thumbnail)s",
             "--print", "before_dl:@@N %(filename)s",
             "--print", "after_move:@@F %(filepath)s",
-            "-P", folder.path,
-            "-o", "%(title).180B.%(ext)s",
+            // Streaming (HLS/DASH) formats fetch their fragments in parallel too.
+            "--concurrent-fragments", "\(max(1, connections))",
         ]
+        args += selectionArguments(for: link, includeCookies: false)
+        if quality != .audio && subtitles {
+            let lang = subtitleLanguage.trimmingCharacters(in: .whitespaces)
+            args += ["--embed-subs", "--sub-langs", "\(lang.isEmpty ? "en" : lang).*"]
+        }
+        if embedDetails {
+            args += ["--embed-metadata", "--embed-thumbnail", "--embed-chapters"]
+        }
+        args += Prefs.cookieArguments(for: link)
+        if let infoFile {
+            args += ["--load-info-json", infoFile.path]
+        } else {
+            args += ["--", link]
+        }
+        return args
+    }
+
+    /// Format choice, output naming and conversion: shared by the accelerator's plan and the
+    /// download itself so both pick exactly the same streams and file names.
+    func selectionArguments(for link: String, includeCookies: Bool = true) -> [String] {
+        var args = ["--no-playlist", "-P", folder.path, "-o", "%(title).180B.%(ext)s"]
 
         switch quality {
         case .audio:
@@ -115,17 +139,8 @@ struct DownloadOptions {
             } else {
                 args += ["--merge-output-format", "mp4/mkv"]
             }
-            if subtitles {
-                let lang = subtitleLanguage.trimmingCharacters(in: .whitespaces)
-                args += ["--embed-subs", "--sub-langs", "\(lang.isEmpty ? "en" : lang).*"]
-            }
         }
-
-        if embedDetails {
-            args += ["--embed-metadata", "--embed-thumbnail", "--embed-chapters"]
-        }
-        args += Prefs.cookieArguments(for: link)
-        args += ["--", link]
+        if includeCookies { args += Prefs.cookieArguments(for: link) }
         return args
     }
 }

@@ -4,11 +4,11 @@ import SwiftUI
 /// A floating panel that can take keyboard input without activating Reel, and appears
 /// over every Space, including full-screen apps.
 final class MenuPanelWindow: NSPanel {
-    init(content: NSViewController) {
+    init(content: NSView) {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 370, height: 300),
                    styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
                    backing: .buffered, defer: true)
-        contentViewController = content
+        contentView = content
         isFloatingPanel = true
         level = .popUpMenu
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
@@ -35,6 +35,7 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
 
     private var item: NSStatusItem?
     private var panel: MenuPanelWindow?
+    private var hostingView: NSHostingView<AnyView>?
     private var clickMonitor: Any?
     private var lastHidden = Date.distantPast
     private var timer: Timer?
@@ -60,17 +61,16 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
         button.window?.delegate = self
         self.item = item
 
-        let host = NSHostingController(
-            rootView: MenuPanel()
+        // The panel never sizes itself during layout (that loops and crashes AppKit);
+        // positionPanel() measures the content and sets the frame explicitly.
+        let hosting = NSHostingView(rootView: AnyView(
+            MenuPanel()
                 .environment(Shared.engine)
                 .environment(Shared.queue)
-        )
-        host.sizingOptions = .preferredContentSize
-        let panel = MenuPanelWindow(content: host)
-        // Keep the panel pinned under the icon as its content grows or shrinks.
-        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { _ in
-            MainActor.assumeIsolated { MenuBarController.shared.positionPanel() }
-        }
+        ))
+        hosting.sizingOptions = []
+        let panel = MenuPanelWindow(content: hosting)
+        hostingView = hosting
         NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { _ in
             MainActor.assumeIsolated { MenuBarController.shared.hidePanel() }
         }
@@ -122,23 +122,27 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
         clickMonitor = nil
     }
 
-    /// Places the panel just below the icon, kept on screen.
+    /// Sizes the panel to its content and places it just below the icon, kept on screen.
     func positionPanel() {
-        guard let panel, let buttonWindow = item?.button?.window,
+        guard let panel, let hostingView, let buttonWindow = item?.button?.window,
               let screen = buttonWindow.screen ?? NSScreen.main else { return }
+        let fitting = hostingView.fittingSize
+        let size = NSSize(width: 370, height: min(max(fitting.height, 120), screen.visibleFrame.height - 40).rounded())
         let icon = buttonWindow.frame
-        let size = panel.frame.size
         let visible = screen.frame
         var x = icon.midX - size.width / 2
         x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
         let y = icon.minY - size.height - 6
-        panel.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
+        let frame = NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
+        if panel.frame != frame { panel.setFrame(frame, display: true) }
     }
 
     // MARK: Icon
 
     private func refreshIcon() {
         guard let button = item?.button else { return }
+        // Follow the content's height (rows come and go) outside any layout pass.
+        if isPanelShown { positionPanel() }
         let queue = Shared.queue
         let active = queue.activeCount > 0
         let progress = queue.overallFraction

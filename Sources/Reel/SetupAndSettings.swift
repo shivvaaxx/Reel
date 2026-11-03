@@ -164,12 +164,22 @@ private struct DownloadSettings: View {
     @AppStorage("embedDetails") private var embedDetails = true
     @AppStorage("subtitles") private var subtitles = false
     @AppStorage("subtitleLanguage") private var subtitleLanguage = "en"
+    @AppStorage("connections") private var connections = 8
 
     var body: some View {
         Form {
             Section {
                 Picker("Default quality", selection: $defaultQuality) {
                     ForEach(Quality.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                Picker(selection: $connections) {
+                    Text("Off").tag(1)
+                    Text("4 connections").tag(4)
+                    Text("8 connections").tag(8)
+                    Text("16 connections").tag(16)
+                } label: {
+                    Text("Accelerate downloads")
+                    Text("Splits each video into segments and downloads them at the same time, like a download manager. Often several times faster, especially on YouTube.")
                 }
                 Picker("Audio format", selection: $audioFormat) {
                     ForEach(AudioFormat.allCases) { Text($0.label).tag($0.rawValue) }

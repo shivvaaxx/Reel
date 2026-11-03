@@ -27,7 +27,13 @@ final class DownloadJob: Identifiable {
     var galleryFiles: [URL] = []
     var log: [String] = []
 
+    /// Connections in use while the accelerator is fetching (nil otherwise).
+    var activeConnections: Int?
+
     @ObservationIgnored var process: Process?
+    @ObservationIgnored var accelerator: SegmentedDownloader?
+    @ObservationIgnored var acceleratorTask: Task<Void, Never>?
+    @ObservationIgnored var plan: AcceleratedPlan?
     @ObservationIgnored var completedStreamBytes: Double = 0
     @ObservationIgnored var currentFormat: String?
     @ObservationIgnored var currentStreamTotal: Double = 0
@@ -60,6 +66,16 @@ final class DownloadJob: Identifiable {
     }
 
     var canPause: Bool { kind == .video && (status == .starting || status == .downloading) }
+
+    func resetProgressForFallback() {
+        fraction = nil
+        downloadedBytes = 0
+        speed = nil
+        eta = nil
+        completedStreamBytes = 0
+        currentFormat = nil
+        currentStreamTotal = 0
+    }
 
     func resetProgress() {
         fraction = nil
@@ -115,6 +131,7 @@ extension DownloadJob {
             }
             if let speed, speed > 0 { parts.append("\(speed.byteString)/s") }
             if let eta, eta > 0 { parts.append(Self.timeLeft(eta)) }
+            if let connections = activeConnections, connections > 1 { parts.append("\(connections) connections") }
             return parts.joined(separator: " · ")
         case .processing(let step):
             return step
@@ -320,13 +337,74 @@ final class DownloadQueue {
         job.currentFormat = nil
         job.galleryFiles = []
 
+        job.activeConnections = nil
+
         try? FileManager.default.createDirectory(at: job.options.folder, withIntermediateDirectories: true)
 
+        if job.kind == .video && job.options.connections > 1 {
+            job.acceleratorTask = Task { await self.runAccelerated(job) }
+        } else {
+            launchProcess(job, infoFile: nil)
+        }
+    }
+
+    /// Fetches the streams with many connections, then lets yt-dlp merge and tag them.
+    /// Anything the accelerator can't handle falls back to a normal yt-dlp download.
+    private func runAccelerated(_ job: DownloadJob) async {
+        do {
+            guard let plan = try await AcceleratedPlan.make(for: job, engine: engine) else {
+                if job.stopReason != nil { finish(job, exitStatus: 0) } else { launchProcess(job, infoFile: nil) }
+                return
+            }
+            job.plan = plan
+            job.plannedFilename = plan.finalPath   // used to clean up if cancelled
+            if job.stopReason != nil { finish(job, exitStatus: 0); return }
+
+            let total = Double(plan.totalBytes)
+            job.expectedBytes = total
+            job.status = .downloading
+            job.activeConnections = job.options.connections
+            let downloader = SegmentedDownloader(streams: plan.streams, connections: job.options.connections) {
+                [weak job] downloaded, speed in
+                Task { @MainActor in
+                    guard let job, job.status == .downloading else { return }
+                    job.downloadedBytes = Double(downloaded)
+                    job.fraction = total > 0 ? min(Double(downloaded) / total, 0.99) : nil
+                    job.speed = speed > 0 ? speed : nil
+                    job.eta = speed > 0 ? max(total - Double(downloaded), 0) / speed : nil
+                }
+            }
+            job.accelerator = downloader
+            try await downloader.run()
+            job.accelerator = nil
+            job.activeConnections = nil
+            if job.stopReason != nil { finish(job, exitStatus: 0); return }
+
+            job.log.append("Reel fetched \(plan.streams.count) stream(s) over \(job.options.connections) connections.")
+            job.downloadedBytes = total
+            job.fraction = 0.99
+            job.status = .processing("Finishing…")
+            launchProcess(job, infoFile: plan.infoFile)
+        } catch {
+            job.accelerator = nil
+            job.activeConnections = nil
+            if job.stopReason != nil {
+                finish(job, exitStatus: 0)
+            } else {
+                // Segmented fetching failed (e.g. the server refused ranges): use yt-dlp directly.
+                job.log.append("Accelerator unavailable (\(error.localizedDescription)); using a single connection.")
+                job.resetProgressForFallback()
+                launchProcess(job, infoFile: nil)
+            }
+        }
+    }
+
+    private func launchProcess(_ job: DownloadJob, infoFile: URL?) {
         let process = Process()
         switch job.kind {
         case .video:
             process.executableURL = engine.path(.ytdlp)
-            process.arguments = engine.baseArguments + job.options.videoArguments(for: job.link)
+            process.arguments = engine.baseArguments + job.options.videoArguments(for: job.link, infoFile: infoFile)
         case .gallery:
             process.executableURL = engine.path(.gallerydl)
             process.arguments = job.options.galleryArguments(for: job.link)
@@ -379,7 +457,14 @@ final class DownloadQueue {
     }
 
     private func stop(_ job: DownloadJob) {
-        guard let process = job.process, process.isRunning else { return }
+        if let accelerator = job.accelerator {
+            accelerator.cancel()   // runAccelerated() then calls finish()
+            return
+        }
+        guard let process = job.process, process.isRunning else {
+            // Still resolving the plan; runAccelerated() checks stopReason when it returns.
+            return
+        }
         process.interrupt()
         let pid = process.processIdentifier
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -469,6 +554,10 @@ final class DownloadQueue {
 
     private func finish(_ job: DownloadJob, exitStatus: Int32) {
         job.process = nil
+        job.accelerator = nil
+        job.acceleratorTask = nil
+        job.activeConnections = nil
+        if let info = job.plan?.infoFile, job.stopReason != .pause { try? FileManager.default.removeItem(at: info) }
         switch job.stopReason {
         case .pause:
             job.status = .paused
@@ -500,6 +589,12 @@ final class DownloadQueue {
     }
 
     private func removePartialFiles(of job: DownloadJob) {
+        // Accelerator segments and their ledgers.
+        for stream in job.plan?.streams ?? [] {
+            try? FileManager.default.removeItem(at: stream.partURL)
+            try? FileManager.default.removeItem(at: stream.ledgerURL)
+        }
+        job.plan = nil
         guard let planned = job.plannedFilename else { return }
         let plannedURL = URL(fileURLWithPath: planned)
         let folder = plannedURL.deletingLastPathComponent()
