@@ -19,7 +19,20 @@ fi
 if ! $DRY_RUN; then
   [[ -z "$(git status --porcelain)" ]] || { echo "Commit or stash your changes first." >&2; exit 1; }
   [[ "$(git branch --show-current)" == "main" ]] || { echo "Release from main." >&2; exit 1; }
-  git rev-parse "v$VERSION" >/dev/null 2>&1 && { echo "v$VERSION already exists." >&2; exit 1; }
+  if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+    # A previous run tagged this version but stopped before publishing: finish it.
+    if ! gh release view "v$VERSION" >/dev/null 2>&1 && [[ -f "build/Reel-$VERSION.dmg" ]]; then
+      echo "v$VERSION is tagged but not published yet; finishing that release."
+      NOTES=$(git show "v$VERSION:CHANGELOG.md" | awk -v v="$VERSION" 'index($0, "## [" v "]") == 1 {p=1; next} /^## \[/ {if (p) exit} p')
+      git push origin "v$VERSION"
+      gh release create "v$VERSION" "build/Reel-$VERSION.dmg" --title "Reel $VERSION" --notes "$NOTES"
+      git push origin main
+      echo "Released Reel $VERSION. Sparkle users will be offered it within a day."
+      exit 0
+    fi
+    echo "v$VERSION already exists. Use the next version number (see CHANGELOG.md)." >&2
+    exit 1
+  fi
 fi
 
 # 1. Changelog: the [Unreleased] section becomes this version's notes.
@@ -91,6 +104,9 @@ fi
 git add VERSION CHANGELOG.md appcast.xml
 git commit -m "Release $VERSION"
 git tag "v$VERSION"
-git push origin main "v$VERSION"
+# Publish the download before pushing the appcast that points to it, so Sparkle never
+# offers an update whose file isn't there yet.
+git push origin "v$VERSION"
 gh release create "v$VERSION" "$DMG" --title "Reel $VERSION" --notes "$NOTES"
+git push origin main
 echo "Released Reel $VERSION. Sparkle users will be offered it within a day."
