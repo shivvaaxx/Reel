@@ -46,6 +46,11 @@ struct DownloadOptions {
     var subtitleLanguage: String
     /// Simultaneous connections per download (1 = accelerator off).
     var connections: Int
+    /// Optional section of the video to download, in seconds.
+    var clipStart: Double? = nil
+    var clipEnd: Double? = nil
+
+    var isClip: Bool { clipStart != nil || clipEnd != nil }
 
     static func current(quality: Quality) -> DownloadOptions {
         let d = UserDefaults.standard
@@ -107,7 +112,15 @@ struct DownloadOptions {
     /// Format choice, output naming and conversion: shared by the accelerator's plan and the
     /// download itself so both pick exactly the same streams and file names.
     func selectionArguments(for link: String, includeCookies: Bool = true) -> [String] {
-        var args = ["--no-playlist", "-P", folder.path, "-o", "%(title).180B.%(ext)s"]
+        var args = ["--no-playlist", "-P", folder.path]
+        if isClip {
+            let start = clipStart ?? 0
+            let end = clipEnd.map { String(format: "%.2f", $0) } ?? "inf"
+            args += ["--download-sections", String(format: "*%.2f-", start) + end,
+                     "-o", "%(title).160B (\(Self.clock(start))–\(clipEnd.map(Self.clock) ?? "end")).%(ext)s"]
+        } else {
+            args += ["-o", "%(title).180B.%(ext)s"]
+        }
 
         switch quality {
         case .audio:
@@ -142,6 +155,11 @@ struct DownloadOptions {
         }
         if includeCookies { args += Prefs.cookieArguments(for: link) }
         return args
+    }
+
+    /// 95 → "1.35", 3725 → "1.02.05" (dots, since colons are awkward in file names).
+    static func clock(_ seconds: Double) -> String {
+        seconds.clockString.replacingOccurrences(of: ":", with: ".")
     }
 }
 
@@ -183,11 +201,28 @@ enum Prefs {
         }
     }
 
-    /// Browser sign-in is only borrowed for the sites that need it.
+    /// Sites the browser sign-in is used for, chosen in Settings › Accounts.
+    static let signInSiteKeys: [(key: String, name: String)] = [
+        ("instagram", "Instagram"), ("tiktok", "TikTok"), ("youtube", "YouTube"), ("other", "Other sites"),
+    ]
+
+    static var signInSites: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: "signInSites") ?? ["instagram", "tiktok"])
+    }
+
+    static func siteKey(for link: String) -> String {
+        switch site(for: link) {
+        case .instagram: "instagram"
+        case .tiktok: "tiktok"
+        case .youtube: "youtube"
+        case .other: "other"
+        }
+    }
+
+    /// Browser sign-in is only borrowed for the sites you chose.
     static func cookieArguments(for link: String) -> [String] {
         let browser = cookieBrowser
-        let site = site(for: link)
-        guard browser != "none", site == .instagram || site == .tiktok else { return [] }
+        guard browser != "none", signInSites.contains(siteKey(for: link)) else { return [] }
         return ["--cookies-from-browser", browser]
     }
 
@@ -219,6 +254,7 @@ struct MediaInfo {
     let duration: Double?
     let thumbnail: URL?
     let entries: [Entry]
+    let isLive: Bool
 
     var isPlaylist: Bool { !entries.isEmpty }
 
@@ -227,6 +263,7 @@ struct MediaInfo {
         title = (json["title"] as? String) ?? "Untitled"
         uploader = (json["uploader"] as? String) ?? (json["channel"] as? String)
         duration = (json["duration"] as? NSNumber)?.doubleValue
+        isLive = (json["is_live"] as? Bool) ?? false
 
         if (json["_type"] as? String) == "playlist", let raw = json["entries"] as? [[String: Any]] {
             entries = raw.compactMap { item in

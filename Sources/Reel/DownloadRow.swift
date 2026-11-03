@@ -74,6 +74,9 @@ struct JobControls: View {
                 button("xmark.circle.fill", help: "Cancel") { queue.cancel(job) }
             case .finished:
                 button("magnifyingglass.circle.fill", help: "Show in Finder") { job.reveal() }
+            case .alreadyDownloaded:
+                button("arrow.down.circle.fill", help: "Download Again") { queue.retry(job) }
+                button("magnifyingglass.circle.fill", help: "Show in Finder") { job.reveal() }
             case .failed, .cancelled:
                 button("arrow.clockwise.circle.fill", help: "Try Again") { queue.retry(job) }
                 button("minus.circle.fill", help: "Remove") { withAnimation { queue.remove(job) } }
@@ -99,7 +102,7 @@ struct JobMenu: View {
     @Binding var showingLog: Bool
 
     var body: some View {
-        if job.status == .finished {
+        if job.status == .finished || job.status == .alreadyDownloaded {
             Button("Open") { job.open() }
             Button("Show in Finder") { job.reveal() }
             Divider()

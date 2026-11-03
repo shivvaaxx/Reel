@@ -45,13 +45,101 @@ struct QualityPicker: View {
     }
 }
 
+/// A section of a video to download, in seconds (nil end = to the end).
+struct Clip: Equatable {
+    var start: Double?
+    var end: Double?
+}
+
+/// Parses "1:23", "1:02:03", "83" or "83.5" into seconds.
+enum TimeText {
+    static func seconds(_ text: String) -> Double? {
+        let parts = text.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false)
+        guard !parts.isEmpty, parts.count <= 3 else { return nil }
+        var total = 0.0
+        for part in parts {
+            guard let value = Double(part), value >= 0 else { return nil }
+            total = total * 60 + value
+        }
+        return total
+    }
+}
+
 /// Shown after looking up a single video.
 struct VideoCard: View {
     let info: MediaInfo
     @Binding var quality: Quality
-    let onDownload: () -> Void
+    /// Called with a clip when trimming, nil for the whole video.
+    let onDownload: (Clip?) -> Void
+
+    @State private var trimming = false
+    @State private var startText = ""
+    @State private var endText = ""
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            summary
+            if trimming {
+                trimRow
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .padding(16)
+        .background(.fill.quinary, in: .rect(cornerRadius: 20))
+        .animation(.smooth(duration: 0.25), value: trimming)
+    }
+
+    private var clip: Clip? {
+        guard trimming else { return nil }
+        let start = TimeText.seconds(startText).flatMap { $0 > 0 ? $0 : nil }
+        let end = TimeText.seconds(endText).flatMap { value in
+            info.duration.map { value < $0 - 0.5 } ?? true ? value : nil
+        }
+        return start == nil && end == nil ? nil : Clip(start: start, end: end)
+    }
+
+    private var clipIsValid: Bool {
+        guard trimming else { return true }
+        if !startText.isEmpty, TimeText.seconds(startText) == nil { return false }
+        if !endText.isEmpty, TimeText.seconds(endText) == nil { return false }
+        if let c = clip, let s = c.start, let e = c.end, e <= s { return false }
+        if let c = clip, let s = c.start, let d = info.duration, s >= d { return false }
+        return true
+    }
+
+    private var trimRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "scissors").foregroundStyle(.secondary)
+            Text("From")
+            TextField("0:00", text: $startText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+                .monospacedDigit()
+            Text("to")
+            TextField(info.duration?.clockString ?? "end", text: $endText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 80)
+                .monospacedDigit()
+            if !clipIsValid {
+                Label("Check the times", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.callout)
+            } else if let c = clip {
+                Text(clipLength(c))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private func clipLength(_ c: Clip) -> String {
+        let end = c.end ?? info.duration
+        guard let end else { return "" }
+        return "\((end - (c.start ?? 0)).clockString) long"
+    }
+
+    private var summary: some View {
         HStack(alignment: .top, spacing: 16) {
             Thumbnail(url: info.thumbnail, width: 208)
                 .overlay(alignment: .bottomTrailing) {
@@ -77,21 +165,28 @@ struct VideoCard: View {
                 Spacer(minLength: 12)
                 HStack(spacing: 10) {
                     QualityPicker(quality: $quality)
+                    Toggle(isOn: $trimming) {
+                        Label("Trim", systemImage: "scissors")
+                    }
+                    .toggleStyle(.button)
+                    .help("Download only part of the video")
+                    .disabled(info.isLive)
                     Spacer()
-                    Button(action: onDownload) {
-                        Label("Download", systemImage: "arrow.down")
+                    Button {
+                        onDownload(clip)
+                    } label: {
+                        Label(clip == nil ? "Download" : "Download Clip", systemImage: "arrow.down")
                             .padding(.horizontal, 6)
                     }
                     .buttonStyle(.glassProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!clipIsValid)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: 117)
-        .padding(16)
-        .background(.fill.quinary, in: .rect(cornerRadius: 20))
     }
 }
 
@@ -135,6 +230,8 @@ struct PlaylistCard: View {
     let info: MediaInfo
     @Binding var quality: Quality
     @Binding var selection: Set<String>
+    /// Entries already in the Library.
+    var downloaded: Set<String> = []
     let onDownload: () -> Void
 
     private var allSelected: Bool { selection.count == info.entries.count }
@@ -147,7 +244,7 @@ struct PlaylistCard: View {
                     Text(info.title)
                         .font(.title3.weight(.semibold))
                         .lineLimit(1)
-                    Text(info.entries.count == 1 ? "1 video" : "\(info.entries.count) videos")
+                    Text(countText)
                         .foregroundStyle(.secondary)
                     if let uploader = info.uploader {
                         Text(uploader).foregroundStyle(.secondary).lineLimit(1)
@@ -171,6 +268,12 @@ struct PlaylistCard: View {
                                     .frame(width: 24, alignment: .trailing)
                                 Text(entry.title).lineLimit(1)
                                 Spacer()
+                                if downloaded.contains(entry.id) {
+                                    Label("Downloaded", systemImage: "checkmark.circle.fill")
+                                        .labelStyle(.titleAndIcon)
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
                                 if let duration = entry.duration {
                                     Text(duration.clockString)
                                         .font(.callout.monospacedDigit())
@@ -203,6 +306,12 @@ struct PlaylistCard: View {
         }
         .padding(16)
         .background(.fill.quinary, in: .rect(cornerRadius: 20))
+    }
+
+    private var countText: String {
+        let total = info.entries.count == 1 ? "1 video" : "\(info.entries.count) videos"
+        let done = info.entries.filter { downloaded.contains($0.id) }.count
+        return done > 0 ? "\(total) · \(done) already downloaded" : total
     }
 
     private func binding(for id: String) -> Binding<Bool> {
