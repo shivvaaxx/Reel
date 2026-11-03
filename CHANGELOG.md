@@ -18,9 +18,11 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 - Sign-in can be used for any site you choose, including age-restricted YouTube.
 - Photo posts show "Saving 3 of 8…"; TikTok photos get readable names.
 - Pause All / Resume All, View and Downloads menus, Support tab (Ko-fi and GitHub Sponsors).
-- Launch options `--quality` and `--clip`.
+- **Send links from anywhere:** a Share menu extension, a Safari toolbar button, a "Download with Reel" Shortcuts action, a Services menu item, a bookmarklet and `reel://download?url=` links.
+- Launch options `--quality` (e.g. `1080p`, `4k`, `audio`) and `--clip`.
 
 ### Changed
+- **New app icon**: a pink-to-indigo tile with a download arrow and play button.
 - Reel only checks *whether* a link was copied (no macOS paste warnings) and reads it when you click.
 - yt-dlp now runs from Reel's private Python environment: each step starts ~20× faster.
 - Builds are signed with a stable identity, so macOS remembers Reel's permissions across updates.
