@@ -348,3 +348,20 @@ extension Double {
         ByteCountFormatter.string(fromByteCount: Int64(self), countStyle: .file)
     }
 }
+
+extension Quality {
+    /// Parses a launch argument such as `1080p`, `4k`, `best` or `audio` (case-insensitive).
+    init?(argument: String) {
+        let text = argument.lowercased().trimmingCharacters(in: .whitespaces)
+        switch text {
+        case "best", "max": self = .best
+        case "4k", "2160", "2160p", "p2160": self = .p2160
+        case "1440", "1440p", "2k", "p1440": self = .p1440
+        case "1080", "1080p", "p1080": self = .p1080
+        case "720", "720p", "p720": self = .p720
+        case "480", "480p", "p480": self = .p480
+        case "audio", "mp3", "m4a": self = .audio
+        default: return nil
+        }
+    }
+}

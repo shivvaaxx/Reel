@@ -190,7 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             func value(after flag: String) -> String? {
                 args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
             }
-            let quality = value(after: "--quality").flatMap(Quality.init(rawValue:))
+            let quality = value(after: "--quality").flatMap(Quality.init(argument:))
             let clip = value(after: "--clip").flatMap(Handoff.parseClip)
             if let flag = args.firstIndex(of: "--download") {
                 for link in args[(flag + 1)...] where link.hasPrefix("http") {

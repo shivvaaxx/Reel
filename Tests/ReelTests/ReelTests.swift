@@ -193,3 +193,15 @@ struct ErrorTests {
         #expect(Engine.readableError("nothing useful", fallback: "fallback") == "fallback")
     }
 }
+
+@Suite("Launch arguments")
+struct QualityArgumentTests {
+    @Test func parsesFriendlyNames() {
+        #expect(Quality(argument: "1080p") == .p1080)
+        #expect(Quality(argument: "4K") == .p2160)
+        #expect(Quality(argument: "best") == .best)
+        #expect(Quality(argument: "audio") == .audio)
+        #expect(Quality(argument: "p720") == .p720)
+        #expect(Quality(argument: "potato") == nil)
+    }
+}
