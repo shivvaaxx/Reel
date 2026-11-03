@@ -28,6 +28,14 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/shivvaaxx/Reel/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>QgUVriSIoAHR5f+wBQaMMW+k17vupu0OsRUd7iM0kME=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Reel adds the photos and videos you download to your Photos library, if you turn this on in Settings.</string>
     <key>NSAppleEventsUsageDescription</key>
