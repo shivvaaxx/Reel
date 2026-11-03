@@ -68,6 +68,7 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
             MenuPanel()
                 .environment(Shared.engine)
                 .environment(Shared.queue)
+                .environment(Shared.library)
         ))
         controller.sizingOptions = []
         let hosting = controller.view
@@ -263,7 +264,8 @@ struct MenuPanel: View {
     @Environment(DownloadQueue.self) private var queue
     @Environment(Engine.self) private var engine
     @State private var link = ""
-    @State private var copied: String?
+    @State private var clipboardHasLink = false
+    @State private var usedClipboardChange = -1
     @State private var dropTargeted = false
     @FocusState private var focused: Bool
     @Environment(\.openSettings) private var openSettings
@@ -310,17 +312,14 @@ struct MenuPanel: View {
             .padding(.vertical, 8)
             .glassEffect(.regular.interactive(), in: .capsule)
 
-            if let copied, link.isEmpty {
+            if clipboardHasLink, link.isEmpty {
                 Button {
-                    queue.quickAdd(copied)
-                    self.copied = nil
+                    // The clipboard is read only now, because you asked.
+                    if let copied = Clipboard.readLink() { queue.quickAdd(copied) }
+                    usedClipboardChange = Clipboard.changeCount
+                    clipboardHasLink = false
                 } label: {
-                    Label {
-                        Text("Download copied link ") + Text(ContentView.shortened(copied)).foregroundStyle(.secondary)
-                    } icon: {
-                        Image(systemName: "doc.on.clipboard")
-                    }
-                    .lineLimit(1)
+                    Label("Download Copied Link", systemImage: "doc.on.clipboard")
                 }
                 .buttonStyle(.glass)
             }
@@ -363,6 +362,13 @@ struct MenuPanel: View {
                 Spacer()
                 Button("Clear Finished") { withAnimation { queue.clearFinished() } }
                     .disabled(!queue.hasClearable)
+                Button {
+                    MenuBarController.shared.hidePanel()
+                    NSWorkspace.shared.open(Support.kofi)
+                } label: {
+                    Image(systemName: "heart")
+                }
+                .help("Support Reel")
                 Button("Quit") {
                     MenuBarController.shared.hidePanel()
                     NSApp.activate()
@@ -389,13 +395,11 @@ struct MenuPanel: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             // The panel is reused; refresh the clipboard suggestion each time it opens.
             guard (note.object as? NSWindow) is MenuPanelWindow else { return }
-            refreshCopied()
+            Task { await refreshClipboard() }
             focused = true
         }
-        .onAppear {
-            copied = ContentView.copiedLink().flatMap { candidate in
-                queue.jobs.contains(where: { $0.link == candidate }) ? nil : candidate
-            }
+        .task {
+            await refreshClipboard()
             focused = true
         }
     }
@@ -407,10 +411,13 @@ struct MenuPanel: View {
         return done > 0 ? "All downloads finished" : "Ready"
     }
 
-    private func refreshCopied() {
-        copied = ContentView.copiedLink().flatMap { candidate in
-            queue.jobs.contains(where: { $0.link == candidate }) ? nil : candidate
+    private func refreshClipboard() async {
+        guard UserDefaults.standard.object(forKey: "suggestClipboard") as? Bool ?? true,
+              Clipboard.changeCount != usedClipboardChange else {
+            clipboardHasLink = false
+            return
         }
+        clipboardHasLink = await Clipboard.containsWebLink()
     }
 
     private func add() {

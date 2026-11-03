@@ -7,14 +7,17 @@ import UserNotifications
 final class DownloadJob: Identifiable {
     enum Status: Equatable {
         case resolving, queued, starting, downloading, processing(String), paused, finished, failed(String), cancelled
+        /// Already in the library; offered as "Download Again" rather than downloaded twice.
+        case alreadyDownloaded
     }
 
-    let id = UUID()
+    let id: UUID
     let link: String
     var kind: DownloadKind
     var title: String
     var thumbnail: URL?
-    let options: DownloadOptions
+    var options: DownloadOptions
+    let addedAt: Date
 
     var status: Status = .queued
     var fraction: Double?
@@ -43,7 +46,10 @@ final class DownloadJob: Identifiable {
 
     enum StopReason { case pause, cancel }
 
-    init(link: String, kind: DownloadKind, title: String, thumbnail: URL?, options: DownloadOptions) {
+    init(id: UUID = UUID(), link: String, kind: DownloadKind, title: String, thumbnail: URL?,
+         options: DownloadOptions, addedAt: Date = Date()) {
+        self.id = id
+        self.addedAt = addedAt
         self.link = link
         self.kind = kind
         self.title = title
@@ -60,7 +66,7 @@ final class DownloadJob: Identifiable {
 
     var isFinishedOrStopped: Bool {
         switch status {
-        case .finished, .failed, .cancelled: true
+        case .finished, .failed, .cancelled, .alreadyDownloaded: true
         default: false
         }
     }
@@ -157,6 +163,8 @@ extension DownloadJob {
             return message
         case .cancelled:
             return "Cancelled"
+        case .alreadyDownloaded:
+            return "Already downloaded · in your Library"
         }
     }
 
@@ -171,7 +179,7 @@ extension DownloadJob {
     }
 
     func open() {
-        guard status == .finished else { return }
+        guard status == .finished || status == .alreadyDownloaded else { return }
         if let first = galleryFiles.first ?? fileURL { NSWorkspace.shared.open(first) }
     }
 
@@ -190,11 +198,86 @@ extension DownloadJob {
 
 @MainActor @Observable
 final class DownloadQueue {
-    var jobs: [DownloadJob] = []
+    var jobs: [DownloadJob] = [] {
+        didSet { scheduleSave() }
+    }
     let engine: Engine
+    let library: Library
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    private static let file = "downloads.json"
 
-    init(engine: Engine) {
+    init(engine: Engine, library: Library) {
         self.engine = engine
+        self.library = library
+        restore()
+    }
+
+    // MARK: Saving between launches
+
+    private func restore() {
+        guard let records = Persistence.load([JobRecord].self, from: Self.file) else { return }
+        let resumeOnLaunch = UserDefaults.standard.object(forKey: "resumeOnLaunch") as? Bool ?? true
+        jobs = records.map { record in
+            var options = DownloadOptions.current(quality: Quality(rawValue: record.quality) ?? .best)
+            options.clipStart = record.clipStart
+            options.clipEnd = record.clipEnd
+            let job = DownloadJob(id: record.id, link: record.link, kind: record.isGallery ? .gallery : .video,
+                                  title: record.title,
+                                  thumbnail: record.thumbnail.flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : URL(string: $0) },
+                                  options: options, addedAt: record.addedAt)
+            job.fileURL = record.file.map { URL(fileURLWithPath: $0) }
+            job.galleryFiles = record.galleryFiles.map { URL(fileURLWithPath: $0) }
+            job.fileSize = record.fileSize
+            job.downloadedBytes = record.downloadedBytes
+            job.expectedBytes = record.expectedBytes
+            if let expected = record.expectedBytes, expected > 0 {
+                job.fraction = min(record.downloadedBytes / expected, 0.99)
+            }
+            switch record.state {
+            case "finished": job.status = .finished; job.fraction = 1
+            case "failed": job.status = .failed(record.message ?? "The download failed.")
+            case "cancelled": job.status = .cancelled
+            case "duplicate": job.status = .alreadyDownloaded
+            case "paused": job.status = .paused
+            default: job.status = resumeOnLaunch ? .queued : .paused   // interrupted by quitting
+            }
+            return job
+        }
+    }
+
+    private func record(for job: DownloadJob) -> JobRecord {
+        let state: String
+        switch job.status {
+        case .finished: state = "finished"
+        case .failed: state = "failed"
+        case .cancelled: state = "cancelled"
+        case .alreadyDownloaded: state = "duplicate"
+        case .paused: state = "paused"
+        default: state = "queued"
+        }
+        var message: String?
+        if case .failed(let text) = job.status { message = text }
+        return JobRecord(
+            id: job.id, link: job.link, isGallery: job.kind == .gallery, title: job.title,
+            thumbnail: job.thumbnail.map { $0.isFileURL ? $0.path : $0.absoluteString },
+            quality: job.options.quality.rawValue, clipStart: job.options.clipStart, clipEnd: job.options.clipEnd,
+            state: state, message: message, file: job.fileURL?.path,
+            galleryFiles: job.galleryFiles.map(\.path), fileSize: job.fileSize,
+            downloadedBytes: job.downloadedBytes, expectedBytes: job.expectedBytes, addedAt: job.addedAt
+        )
+    }
+
+    func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            self?.saveNow()
+        }
+    }
+
+    func saveNow() {
+        Persistence.save(jobs.map(record(for:)), to: Self.file)
     }
 
     var maxConcurrent: Int {
@@ -215,18 +298,36 @@ final class DownloadQueue {
 
     // MARK: Queueing
 
-    func enqueue(link: String, title: String, thumbnail: URL?, quality: Quality, kind: DownloadKind = .video) {
-        let job = DownloadJob(link: link, kind: kind, title: title, thumbnail: thumbnail,
-                              options: .current(quality: quality))
+    func enqueue(link: String, title: String, thumbnail: URL?, quality: Quality, kind: DownloadKind = .video,
+                 clip: (start: Double?, end: Double?)? = nil) {
+        var options = DownloadOptions.current(quality: quality)
+        options.clipStart = clip?.start
+        options.clipEnd = clip?.end
+        let job = DownloadJob(link: link, kind: kind, title: title, thumbnail: thumbnail, options: options)
         jobs.insert(job, at: 0)
         Notifier.requestAuthorization()
         pump()
+    }
+
+    /// Adds a row pointing at an earlier download instead of fetching it again.
+    private func addDuplicate(_ item: LibraryItem, quality: Quality) {
+        let job = DownloadJob(link: item.link, kind: item.isGallery ? .gallery : .video, title: item.title,
+                              thumbnail: item.thumbnailURL, options: .current(quality: quality))
+        job.status = .alreadyDownloaded
+        job.fileURL = item.existingFiles.first
+        job.galleryFiles = item.isGallery ? item.existingFiles : []
+        job.fileSize = item.size
+        jobs.insert(job, at: 0)
     }
 
     /// Adds a link with default settings and no preview: used by the menu bar and drops.
     /// Playlists expand into their videos; photo posts go to gallery-dl.
     func quickAdd(_ link: String) {
         let quality = Prefs.defaultQuality
+        if let item = library.existing(for: link) {
+            addDuplicate(item, quality: quality)
+            return
+        }
         let placeholder = DownloadJob(link: link, kind: Prefs.kind(for: link),
                                       title: Prefs.siteName(for: link) + " link", thumbnail: nil,
                                       options: .current(quality: quality))
@@ -247,7 +348,8 @@ final class DownloadQueue {
                 let info = try await engine.probe(link)
                 if info.isPlaylist {
                     jobs.removeAll { $0.id == placeholder.id }
-                    for entry in info.entries {
+                    // Videos already in the library are skipped.
+                    for entry in info.entries where library.existing(for: entry.url) == nil {
                         enqueue(link: entry.url, title: entry.title, thumbnail: entry.thumbnail, quality: quality)
                     }
                 } else {
@@ -275,6 +377,7 @@ final class DownloadQueue {
             start(next)
         }
         updateBadge()
+        scheduleSave()
     }
 
     // MARK: Controls
@@ -291,6 +394,23 @@ final class DownloadQueue {
         pump()
     }
 
+    var hasPaused: Bool { jobs.contains { $0.status == .paused } }
+    var hasPausable: Bool { jobs.contains { $0.canPause || $0.status == .queued } }
+
+    func pauseAll() {
+        for job in jobs {
+            if job.status == .queued { job.status = .paused }
+            else if job.canPause { pause(job) }
+        }
+        updateBadge()
+        scheduleSave()
+    }
+
+    func resumeAll() {
+        for job in jobs where job.status == .paused { job.status = .queued }
+        pump()
+    }
+
     func cancel(_ job: DownloadJob) {
         if job.isRunning {
             job.stopReason = .cancel
@@ -304,6 +424,8 @@ final class DownloadQueue {
 
     func retry(_ job: DownloadJob) {
         job.resetProgress()
+        job.fileURL = nil
+        job.fileSize = nil
         job.status = .queued
         pump()
     }
@@ -318,11 +440,21 @@ final class DownloadQueue {
         jobs.removeAll(where: \.isFinishedOrStopped)
     }
 
-    func stopAll() {
+    /// Called when quitting: running downloads keep their partial files and are saved as
+    /// queued, so they continue next time Reel opens.
+    func suspendAllForQuit() {
         for job in jobs where job.isRunning {
-            job.stopReason = .cancel
+            job.stopReason = .pause
+            job.accelerator?.cancel()
             job.process?.interrupt()
         }
+        // Record them as interrupted ("queued"), not user-paused.
+        let records = jobs.map { job -> JobRecord in
+            var r = record(for: job)
+            if job.isRunning || job.status == .resolving { r.state = "queued" }
+            return r
+        }
+        Persistence.save(records, to: Self.file)
     }
 
     // MARK: Running the tools
@@ -341,7 +473,8 @@ final class DownloadQueue {
 
         try? FileManager.default.createDirectory(at: job.options.folder, withIntermediateDirectories: true)
 
-        if job.kind == .video && job.options.connections > 1 {
+        // Clips are cut by FFmpeg while downloading, so they skip the accelerator.
+        if job.kind == .video && job.options.connections > 1 && !job.options.isClip {
             job.acceleratorTask = Task { await self.runAccelerated(job) }
         } else {
             launchProcess(job, infoFile: nil)
@@ -576,6 +709,7 @@ final class DownloadQueue {
                 let files = job.kind == .gallery ? job.galleryFiles : [job.fileURL].compactMap { $0 }
                 let sizes = files.compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize }
                 if !sizes.isEmpty { job.fileSize = Double(sizes.reduce(0, +)) }
+                if !job.options.isClip { library.record(job) }
                 Notifier.downloadFinished(job)
             } else if job.kind == .gallery && exitStatus == 0 {
                 job.status = .failed("There was nothing to save in this post.")

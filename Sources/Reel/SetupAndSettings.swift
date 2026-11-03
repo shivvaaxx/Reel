@@ -90,6 +90,7 @@ struct SettingsView: View {
             Tab("Downloads", systemImage: "arrow.down.circle") { DownloadSettings() }
             Tab("Accounts", systemImage: "person.crop.circle") { AccountSettings() }
             Tab("Engine", systemImage: "shippingbox") { EngineSettings() }
+            Tab("Support", systemImage: "heart") { SupportSettings() }
         }
         .frame(width: 500)
         .scenePadding()
@@ -103,6 +104,7 @@ private struct GeneralSettings: View {
     @AppStorage("suggestClipboard") private var suggestClipboard = true
     @AppStorage("showInDock") private var showInDock = true
     @AppStorage("showInMenuBar") private var showInMenuBar = true
+    @AppStorage("resumeOnLaunch") private var resumeOnLaunch = true
 
     var body: some View {
         Form {
@@ -139,7 +141,14 @@ private struct GeneralSettings: View {
                 ForEach(1...5, id: \.self) { Text("\($0)").tag($0) }
             }
             Toggle("Notify me when a download finishes", isOn: $notify)
-            Toggle("Offer to use copied links", isOn: $suggestClipboard)
+            Toggle(isOn: $suggestClipboard) {
+                Text("Offer to use copied links")
+                Text("Reel only checks whether a link was copied; it reads the clipboard when you click the button.")
+            }
+            Toggle(isOn: $resumeOnLaunch) {
+                Text("Continue unfinished downloads when Reel opens")
+                Text("Downloads interrupted by quitting pick up where they left off.")
+            }
         }
         .formStyle(.grouped)
     }
@@ -206,6 +215,7 @@ private struct DownloadSettings: View {
 
 private struct AccountSettings: View {
     @AppStorage("cookieBrowser") private var cookieBrowser = "none"
+    @State private var signInSites = Prefs.signInSites
 
     private let browsers: [(id: String, name: String)] = [
         ("none", "Don't Use a Sign-In"),
@@ -223,8 +233,24 @@ private struct AccountSettings: View {
                     ForEach(browsers, id: \.id) { Text($0.name).tag($0.id) }
                 }
             } footer: {
-                Text("Instagram and TikTok often only show posts to signed-in people. Reel can borrow the sign-in from your browser for those two sites only. It's never sent anywhere else.")
+                Text("Some posts and videos are only shown to signed-in people (Instagram, TikTok, age-restricted or members-only YouTube). Reel can borrow your browser's sign-in for the sites you tick below. It's read on your Mac by the download tools and never sent anywhere else.")
                     .foregroundStyle(.secondary)
+            }
+
+            if cookieBrowser != "none" {
+                Section("Use it for") {
+                    ForEach(Prefs.signInSiteKeys, id: \.key) { site in
+                        Toggle(site.name, isOn: Binding(
+                            get: { signInSites.contains(site.key) },
+                            set: { on in
+                                var sites = signInSites
+                                if on { sites.insert(site.key) } else { sites.remove(site.key) }
+                                UserDefaults.standard.set(Array(sites).sorted(), forKey: "signInSites")
+                                signInSites = sites
+                            }
+                        ))
+                    }
+                }
             }
 
             if cookieBrowser == "safari" {
@@ -242,6 +268,48 @@ private struct AccountSettings: View {
                 Section {
                     Text("The first time, macOS may ask whether Reel can use your browser's saved data. Choose Always Allow.")
                         .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct SupportSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                VStack(spacing: 10) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.pink)
+                    Text("Reel is free and open source")
+                        .font(.headline)
+                    Text("If it saves you time, you can support its development. Every coffee helps keep Reel updated as sites change.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            Section {
+                LabeledContent {
+                    Button("Buy Me a Coffee…") { NSWorkspace.shared.open(Support.kofi) }
+                } label: {
+                    Text("Ko-fi")
+                    Text("A one-off tip by card, PayPal or Apple Pay.")
+                }
+                LabeledContent {
+                    Button("Sponsor…") { NSWorkspace.shared.open(Support.sponsors) }
+                } label: {
+                    Text("GitHub Sponsors")
+                    Text("Monthly or one-time, for GitHub users.")
+                }
+                LabeledContent {
+                    Button("Open GitHub…") { NSWorkspace.shared.open(Support.repository) }
+                } label: {
+                    Text("Star the project or report a problem")
+                    Text("Free, and it helps too.")
                 }
             }
         }

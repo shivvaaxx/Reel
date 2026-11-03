@@ -4,52 +4,80 @@ import SwiftUI
 struct ContentView: View {
     @Environment(Engine.self) private var engine
     @Environment(DownloadQueue.self) private var queue
+    @Environment(Library.self) private var library
     @AppStorage("defaultQuality") private var defaultQuality = Quality.best.rawValue
     @AppStorage("suggestClipboard") private var suggestClipboard = true
     @Environment(\.openWindow) private var openWindow
+
+    enum Section: String { case downloads, library }
 
     enum Lookup {
         case idle, loading, loaded(MediaInfo), gallery(String), failed(String)
     }
 
+    /// A download waiting on "you've downloaded this before" confirmation.
+    struct PendingDuplicate: Identifiable {
+        let id = UUID()
+        let item: LibraryItem
+        let proceed: () -> Void
+    }
+
+    @State private var section: Section = .downloads
     @State private var link = ""
     @State private var lookup: Lookup = .idle
     @State private var lookupTask: Task<Void, Never>?
     @State private var quality: Quality = .best
     @State private var selection: Set<String> = []
-    @State private var clipboardLink: String?
-    @State private var dismissedClipboard: String?
+    @State private var clipboardHasLink = false
+    @State private var dismissedClipboardChange = -1
     @State private var dropTargeted = false
+    @State private var pendingDuplicate: PendingDuplicate?
     @FocusState private var linkFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
-                linkBar
-                lookupArea
+        Group {
+            switch section {
+            case .downloads: downloadsPane
+            case .library: LibraryView()
             }
-            .padding(20)
-            .animation(.smooth(duration: 0.3), value: lookupKey)
-
-            downloads
         }
-        .frame(minWidth: 620, minHeight: 540)
+        .frame(minWidth: 640, minHeight: 540)
         .navigationTitle("Reel")
+        .navigationSubtitle(section == .downloads ? subtitle : "")
         .background(WindowIdentifier())
-        .navigationSubtitle(subtitle)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Clear Finished", systemImage: "checklist.checked") {
-                    withAnimation { queue.clearFinished() }
+            ToolbarItem(placement: .principal) {
+                Picker("View", selection: $section) {
+                    Text("Downloads").tag(Section.downloads)
+                    Text("Library").tag(Section.library)
                 }
-                .help("Remove finished, cancelled and failed downloads from the list")
-                .disabled(!queue.hasClearable)
+                .pickerStyle(.segmented)
+                .fixedSize()
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Show Downloads Folder", systemImage: "folder") {
-                    NSWorkspace.shared.open(Prefs.downloadFolder)
+            if section == .downloads {
+                ToolbarItem(placement: .primaryAction) {
+                    if queue.hasPaused && !queue.hasPausable {
+                        Button("Resume All", systemImage: "play.fill") { queue.resumeAll() }
+                            .help("Resume all paused downloads")
+                    } else {
+                        Button("Pause All", systemImage: "pause.fill") { queue.pauseAll() }
+                            .help("Pause all downloads")
+                            .disabled(!queue.hasPausable)
+                    }
                 }
-                .help("Open the downloads folder")
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Clear Finished", systemImage: "checklist.checked") {
+                        withAnimation { queue.clearFinished() }
+                    }
+                    .help("Remove finished, cancelled and failed downloads from the list (they stay in your Library)")
+                    .disabled(!queue.hasClearable)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Show Downloads Folder", systemImage: "folder") {
+                        NSWorkspace.shared.open(Prefs.downloadFolder)
+                    }
+                    .help("Open the downloads folder")
+                }
             }
         }
         .overlay { setupOverlay }
@@ -63,30 +91,57 @@ struct ContentView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
+            section = .downloads
             link = url.absoluteString
             lookUp()
             return true
         } isTargeted: { dropTargeted = $0 }
+        .alert(item: $pendingDuplicate) { pending in
+            Alert(
+                title: Text("You've Already Downloaded This"),
+                message: Text("\u{201C}\(pending.item.title)\u{201D} is in your Library from \(pending.item.date.formatted(date: .abbreviated, time: .omitted))."),
+                primaryButton: .default(Text("Show in Finder")) { pending.item.reveal() },
+                secondaryButton: .default(Text("Download Again")) { pending.proceed() }
+            )
+        }
         .onAppear {
             Shared.openWindowAction = openWindow
             linkFocused = true
-            checkClipboard()
+            Task { await checkClipboard() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            checkClipboard()
+            Task { await checkClipboard() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .reelFocusLink)) { _ in
+            section = .downloads
             linkFocused = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .reelShowLibrary)) { _ in
+            section = .library
+        }
         .onReceive(NotificationCenter.default.publisher(for: .reelDownloadClipboard)) { _ in
-            if let copied = Self.copiedLink() {
+            if let copied = Clipboard.readLink() {
+                section = .downloads
                 link = copied
                 lookUp()
             }
         }
     }
 
-    // MARK: Link bar
+    // MARK: Downloads pane
+
+    private var downloadsPane: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                linkBar
+                lookupArea
+            }
+            .padding(20)
+            .animation(.smooth(duration: 0.3), value: lookupKey)
+
+            downloads
+        }
+    }
 
     private var linkBar: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -116,23 +171,21 @@ struct ContentView: View {
             .padding(.vertical, 13)
             .glassEffect(.regular.interactive(), in: .capsule)
 
-            if let copied = clipboardLink, link.isEmpty {
+            if clipboardHasLink, link.isEmpty, case .idle = lookup {
                 HStack(spacing: 8) {
                     Button {
-                        link = copied
-                        lookUp()
-                    } label: {
-                        Label {
-                            Text("Use copied link ") + Text(Self.shortened(copied)).foregroundStyle(.secondary)
-                        } icon: {
-                            Image(systemName: "doc.on.clipboard")
+                        if let copied = Clipboard.readLink() {
+                            link = copied
+                            lookUp()
                         }
-                        .lineLimit(1)
+                        clipboardHasLink = false
+                    } label: {
+                        Label("Use Copied Link", systemImage: "doc.on.clipboard")
                     }
                     .buttonStyle(.glass)
                     Button {
-                        dismissedClipboard = copied
-                        clipboardLink = nil
+                        dismissedClipboardChange = Clipboard.changeCount
+                        clipboardHasLink = false
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -144,8 +197,6 @@ struct ContentView: View {
             }
         }
     }
-
-    // MARK: Lookup results
 
     @ViewBuilder
     private var lookupArea: some View {
@@ -167,29 +218,35 @@ struct ContentView: View {
                 .transition(.opacity)
         case .gallery(let galleryLink):
             GalleryCard(link: galleryLink) {
-                queue.enqueue(link: galleryLink, title: "\(Prefs.siteName(for: galleryLink)) post",
-                              thumbnail: nil, quality: quality, kind: .gallery)
-                resetLookup()
+                confirmNotDuplicate(galleryLink) {
+                    queue.enqueue(link: galleryLink, title: "\(Prefs.siteName(for: galleryLink)) post",
+                                  thumbnail: nil, quality: quality, kind: .gallery)
+                    resetLookup()
+                }
             }
             .transition(.move(edge: .top).combined(with: .opacity))
         case .loaded(let info):
             Group {
                 if info.isPlaylist {
-                    PlaylistCard(info: info, quality: $quality, selection: $selection) {
+                    PlaylistCard(info: info, quality: $quality, selection: $selection,
+                                 downloaded: downloadedEntries(of: info)) {
                         downloadSelected(from: info)
                     }
                 } else {
-                    VideoCard(info: info, quality: $quality) {
-                        queue.enqueue(link: info.link, title: info.title, thumbnail: info.thumbnail, quality: quality)
-                        resetLookup()
+                    VideoCard(info: info, quality: $quality) { clip in
+                        let enqueue = {
+                            queue.enqueue(link: info.link, title: info.title, thumbnail: info.thumbnail,
+                                          quality: quality, clip: clip.map { ($0.start, $0.end) })
+                            resetLookup()
+                        }
+                        // A clip is a new piece of work, not a duplicate of the full video.
+                        if clip == nil { confirmNotDuplicate(info.link, then: enqueue) } else { enqueue() }
                     }
                 }
             }
             .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
-
-    // MARK: Downloads list
 
     @ViewBuilder
     private var downloads: some View {
@@ -202,7 +259,7 @@ struct ContentView: View {
             .frame(maxHeight: .infinity)
         } else {
             List {
-                Section {
+                SwiftUI.Section {
                     ForEach(queue.jobs) { job in
                         DownloadRow(job: job)
                     }
@@ -215,8 +272,6 @@ struct ContentView: View {
             .animation(.default, value: queue.jobs.map(\.id))
         }
     }
-
-    // MARK: Setup overlay
 
     @ViewBuilder
     private var setupOverlay: some View {
@@ -253,6 +308,18 @@ struct ContentView: View {
         }
     }
 
+    private func confirmNotDuplicate(_ link: String, then proceed: @escaping () -> Void) {
+        if let item = library.existing(for: link) {
+            pendingDuplicate = PendingDuplicate(item: item, proceed: proceed)
+        } else {
+            proceed()
+        }
+    }
+
+    private func downloadedEntries(of info: MediaInfo) -> Set<String> {
+        Set(info.entries.filter { library.existing(for: $0.url) != nil }.map(\.id))
+    }
+
     private func lookUp() {
         var candidate = link.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !candidate.isEmpty else { return }
@@ -262,8 +329,8 @@ struct ContentView: View {
             return
         }
         link = candidate
-        clipboardLink = nil
-        dismissedClipboard = candidate
+        clipboardHasLink = false
+        dismissedClipboardChange = Clipboard.changeCount
         quality = Quality(rawValue: defaultQuality) ?? .best
         lookupTask?.cancel()
         if Prefs.kind(for: candidate) == .gallery {
@@ -275,7 +342,8 @@ struct ContentView: View {
             do {
                 let info = try await engine.probe(candidate)
                 guard !Task.isCancelled else { return }
-                selection = Set(info.entries.map(\.id))
+                // Videos already in the Library start unticked.
+                selection = Set(info.entries.map(\.id)).subtracting(downloadedEntries(of: info))
                 lookup = .loaded(info)
             } catch EngineError.noVideo {
                 guard !Task.isCancelled else { return }
@@ -301,19 +369,10 @@ struct ContentView: View {
         linkFocused = true
     }
 
-    private func checkClipboard() {
-        guard suggestClipboard, let copied = Self.copiedLink(), copied != dismissedClipboard,
-              copied != link else { return }
-        withAnimation(.smooth) { clipboardLink = copied }
-    }
-
-    nonisolated static func copiedLink() -> String? {
-        guard let string = NSPasteboard.general.string(forType: .string)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              !string.contains(" "), !string.contains("\n"),
-              let url = URL(string: string), let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https", url.host != nil else { return nil }
-        return string
+    private func checkClipboard() async {
+        guard suggestClipboard, Clipboard.changeCount != dismissedClipboardChange else { return }
+        let hasLink = await Clipboard.containsWebLink()
+        withAnimation(.smooth) { clipboardHasLink = hasLink }
     }
 
     nonisolated static func shortened(_ link: String) -> String {

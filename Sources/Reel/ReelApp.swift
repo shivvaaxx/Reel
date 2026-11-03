@@ -5,7 +5,8 @@ import UserNotifications
 @MainActor
 enum Shared {
     static let engine = Engine()
-    static let queue = DownloadQueue(engine: engine)
+    static let library = Library()
+    static let queue = DownloadQueue(engine: engine, library: library)
     static var openWindowAction: OpenWindowAction?
 
     static var mainWindow: NSWindow? {
@@ -45,6 +46,7 @@ enum Shared {
 extension Notification.Name {
     static let reelDownloadClipboard = Notification.Name("reelDownloadClipboard")
     static let reelFocusLink = Notification.Name("reelFocusLink")
+    static let reelShowLibrary = Notification.Name("reelShowLibrary")
 }
 
 /// Tags the main window so AppKit code (the menu bar panel) can find it.
@@ -67,12 +69,14 @@ struct ReelApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var engine = Shared.engine
     @State private var queue = Shared.queue
+    @State private var library = Shared.library
 
     var body: some Scene {
         Window("Reel", id: "main") {
             ContentView()
                 .environment(engine)
                 .environment(queue)
+                .environment(library)
                 .task {
                     await engine.prepare()
                     queue.pump()
@@ -93,11 +97,43 @@ struct ReelApp: App {
                 }
                 .keyboardShortcut("v", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .toolbar) {
+                Button("Downloads") {
+                    Shared.openMainWindow()
+                    NotificationCenter.default.post(name: .reelFocusLink, object: nil)
+                }
+                .keyboardShortcut("1")
+                Button("Library") {
+                    Shared.openMainWindow()
+                    NotificationCenter.default.post(name: .reelShowLibrary, object: nil)
+                }
+                .keyboardShortcut("2")
+                Divider()
+            }
+            CommandMenu("Downloads") {
+                Button("Pause All") { Shared.queue.pauseAll() }
+                    .keyboardShortcut("p", modifiers: [.command, .option])
+                Button("Resume All") { Shared.queue.resumeAll() }
+                    .keyboardShortcut("r", modifiers: [.command, .option])
+                Divider()
+                Button("Clear Finished") { Shared.queue.clearFinished() }
+                    .keyboardShortcut("k")
+            }
+            CommandGroup(replacing: .help) {
+                Button("Reel on GitHub") { NSWorkspace.shared.open(Support.repository) }
+                Button("Report a Problem…") {
+                    NSWorkspace.shared.open(Support.repository.appendingPathComponent("issues/new"))
+                }
+                Divider()
+                Button("Support Reel on Ko-fi…") { NSWorkspace.shared.open(Support.kofi) }
+                Button("Sponsor on GitHub…") { NSWorkspace.shared.open(Support.sponsors) }
+            }
         }
 
         Settings {
             SettingsView()
                 .environment(engine)
+                .environment(library)
         }
     }
 }
@@ -146,19 +182,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Nothing is lost on quit: running downloads keep their partial files and continue
+        // the next time Reel opens, so no confirmation is needed.
         MainActor.assumeIsolated {
-            let active = Shared.queue.jobs.filter(\.isRunning).count + Shared.queue.jobs.filter { $0.status == .queued }.count
-            guard active > 0 else { return .terminateNow }
-            let alert = NSAlert()
-            alert.messageText = active == 1 ? "A download is in progress." : "\(active) downloads are in progress."
-            alert.informativeText = "If you quit now, Reel will stop them. You can download them again later."
-            alert.addButton(withTitle: "Quit")
-            alert.addButton(withTitle: "Cancel")
-            NSApp.activate()
-            guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
-            Shared.queue.stopAll()
-            return .terminateNow
+            Shared.queue.suspendAllForQuit()
         }
+        return .terminateNow
     }
 
     // Clicking a "Download Complete" notification shows the file in Finder.

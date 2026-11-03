@@ -25,7 +25,8 @@ enum EngineError: LocalizedError {
 
 /// The external tools Reel keeps its own private, up-to-date copies of.
 enum Component: String, CaseIterable, Identifiable {
-    case ytdlp, ffmpeg, ffprobe, deno, uv, gallerydl
+    // Order matters: uv must exist before the Python tools are installed with it.
+    case uv, ffmpeg, ffprobe, deno, ytdlp, gallerydl
 
     enum Archive { case none, zip, tarGz }
 
@@ -64,10 +65,11 @@ enum Component: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Where to download it from; gallery-dl is installed by uv instead.
+    /// Where to download it from. yt-dlp and gallery-dl are installed by uv into Reel's
+    /// private Python environment instead (it starts ~20× faster than the standalone build).
     var source: URL? {
         switch self {
-        case .ytdlp: URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos")
+        case .ytdlp: nil
         case .ffmpeg: URL(string: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip")
         case .ffprobe: URL(string: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip")
         case .deno: URL(string: "https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip")
@@ -85,7 +87,10 @@ enum Component: String, CaseIterable, Identifiable {
     }
 
     /// Whether setup can show a percentage (gallery-dl's install is a single step).
-    var reportsProgress: Bool { self != .gallerydl }
+    var reportsProgress: Bool { source != nil }
+
+    /// Lives in the Python environment rather than Reel's bin folder.
+    var isPython: Bool { self == .ytdlp || self == .gallerydl }
 }
 
 @MainActor @Observable
@@ -115,7 +120,7 @@ final class Engine {
     }
 
     func path(_ component: Component) -> URL {
-        if component == .gallerydl { return galleryDir.appendingPathComponent("bin/gallery-dl") }
+        if component.isPython { return galleryDir.appendingPathComponent("bin/\(component.fileName)") }
         return binDir.appendingPathComponent(component.fileName)
     }
 
@@ -177,8 +182,11 @@ final class Engine {
                     currentComponent = component
                     componentProgress = 0
                 }
-                if component == .gallerydl {
-                    try await installGallery(fresh: true)
+                if component.isPython {
+                    // One step installs both; the gallery-dl step is skipped if yt-dlp's did it.
+                    if component == .ytdlp || !FileManager.default.isExecutableFile(atPath: path(component).path) {
+                        try await installGallery(fresh: !FileManager.default.isExecutableFile(atPath: galleryDir.appendingPathComponent("bin/python").path))
+                    }
                 } else if let source = component.source {
                     let file = try await Downloader.fetch(source) { fraction in
                         Task { @MainActor [weak self] in
@@ -254,7 +262,7 @@ final class Engine {
         }
         let install = try await Shell.run(
             path(.uv),
-            ["pip", "install", "--upgrade", "--python", python.path, "gallery-dl", "yt-dlp[default]"],
+            ["pip", "install", "--upgrade", "--python", python.path, "gallery-dl", "yt-dlp[default,curl-cffi]"],
             environment: uvEnvironment
         )
         guard install.status == 0 else { throw EngineError.galleryFailed(Engine.lastLine(install.stderr)) }
@@ -303,17 +311,12 @@ final class Engine {
         defer { isUpdating = false }
         var notes: [String] = []
         do {
-            let result = try await Shell.run(path(.ytdlp), ["-U"], environment: environment)
-            let text = result.stdout + result.stderr
-            if text.contains("Updated yt-dlp to") || text.contains("Updating to") {
-                notes.append("yt-dlp updated")
-            } else if result.status != 0 && !text.contains("is up to date") {
-                notes.append(Engine.readableError(result.stderr, fallback: "yt-dlp couldn't check for updates"))
-            }
-            let before = versions[.gallerydl]
+            // yt-dlp and gallery-dl are upgraded together in the Python environment.
+            let before = versions
             try await installGallery(fresh: false)
             await refreshVersions()
-            if let before, versions[.gallerydl] != before { notes.append("gallery-dl updated") }
+            if let old = before[.ytdlp], versions[.ytdlp] != old { notes.append("yt-dlp updated to \(versions[.ytdlp] ?? "?")") }
+            if let old = before[.gallerydl], versions[.gallerydl] != old { notes.append("gallery-dl updated to \(versions[.gallerydl] ?? "?")") }
             UserDefaults.standard.set(Date(), forKey: "lastEngineUpdate")
             updateMessage = notes.isEmpty ? "Everything is up to date." : notes.joined(separator: ", ") + "."
         } catch {
