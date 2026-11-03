@@ -22,12 +22,13 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 - Launch options `--quality` (e.g. `1080p`, `4k`, `audio`) and `--clip`.
 
 ### Changed
-- **New app icon**: a pink-to-indigo tile with a download arrow and play button.
+- **New app icon**: a pink-to-indigo tile with a download arrow and play button, with a black arrow in dark mode and a tinted version for tinted icons.
 - Reel only checks *whether* a link was copied (no macOS paste warnings) and reads it when you click.
 - yt-dlp now runs from Reel's private Python environment: each step starts ~20× faster.
 - Builds are signed with a stable identity, so macOS remembers Reel's permissions across updates.
 
 ### Fixed
+- Release builds can be signed with Developer ID and notarized automatically, so the DMG opens without the "cannot verify" warning.
 - Clip downloads and some streaming formats failed because FFmpeg couldn't verify HTTPS certificates.
 - A rare crash at launch when the window and the menu bar panel checked the clipboard at the same time.
 - Menu bar panel corners and its cut-off header; the panel now works over full-screen apps.

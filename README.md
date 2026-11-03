@@ -141,7 +141,8 @@ You need Xcode 26 or later (Swift 6.2+) and [XcodeGen](https://github.com/yonask
 git clone https://github.com/shivvaaxx/Reel.git
 cd Reel
 ./build.sh        # fetches Sparkle, builds build/Reel.app with its extensions
-./make-dmg.sh     # optional: packages build/Reel-<version>.dmg
+./install.sh      # optional: builds and installs into /Applications
+./make-dmg.sh     # optional: packages build/Reel-<version>.dmg (notarized when set up)
 swift test        # runs the test suite
 ```
 
@@ -169,6 +170,7 @@ swift test        # runs the test suite
 | `Clipboard.swift` | Copied-link detection and support links |
 | `Shell.swift` | Process, line-buffer and download helpers |
 | `Extensions/` | Share, Safari and Shortcuts extensions |
+| `Resources/AppIcon.icon` | The app icon (light, dark and tinted), editable in Icon Composer |
 | `tools/MakeIcon.swift` | Renders the app icon |
 | `release.sh` | Builds, signs and publishes a release and its update feed |
 
