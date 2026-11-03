@@ -4,6 +4,8 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-04
+
 ### Added
 - **Automatic updates.** Reel checks for new versions daily and shows what's new before installing; updates are verified with a signing key. (People on 1.0 need to download this version once by hand.)
 - **Downloads survive quitting.** The list is saved; unfinished downloads continue next time Reel opens, from where they stopped.
