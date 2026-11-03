@@ -5,6 +5,8 @@ import SwiftUI
 struct SubscriptionsView: View {
     @Environment(Subscriptions.self) private var subscriptions
     @AppStorage("subscriptionHours") private var hours = 6.0
+    /// Folder for subscriptions that haven't chosen their own ("" = Reel's download folder).
+    @AppStorage(Subscriptions.defaultFolderKey) private var defaultFolderPath = ""
     @State private var link = ""
     @State private var quality = Prefs.defaultQuality
     @State private var latest = 0
@@ -12,8 +14,6 @@ struct SubscriptionsView: View {
     @State private var error: String?
     @State private var selection: Set<UUID> = []
     @State private var notice: String?
-    /// nil = Reel's download folder.
-    @State private var folder: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,11 +30,12 @@ struct SubscriptionsView: View {
                 List(selection: $selection) {
                     Section {
                         ForEach(subscriptions.items) { sub in
-                            SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id)) {
+                            SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id),
+                                            defaultFolder: defaultFolder) {
                                 downloadExisting(sub)
                             }
-                                .tag(sub.id)
-                                .contextMenu { menu(for: sub) }
+                            .tag(sub.id)
+                            .contextMenu { menu(for: sub) }
                         }
                     } header: {
                         HStack {
@@ -59,6 +60,10 @@ struct SubscriptionsView: View {
                 .onDeleteCommand { subscriptions.remove(selection) }
             }
         }
+    }
+
+    private var defaultFolder: URL {
+        defaultFolderPath.isEmpty ? Prefs.downloadFolder : URL(fileURLWithPath: defaultFolderPath, isDirectory: true)
     }
 
     private var hoursText: String {
@@ -94,13 +99,29 @@ struct SubscriptionsView: View {
                 .labelsHidden()
                 .fixedSize()
                 Menu {
-                    Button("Reel's Download Folder") { folder = nil }
-                    Button("Choose Folder…") { if let url = Self.chooseFolder() { folder = url } }
+                    Section("Default folder for subscriptions") {
+                        Button {
+                            defaultFolderPath = ""
+                        } label: {
+                            if defaultFolderPath.isEmpty {
+                                Label("Reel's Download Folder", systemImage: "checkmark")
+                            } else {
+                                Text("Reel's Download Folder")
+                            }
+                        }
+                        Button("Choose Folder…") {
+                            if let url = Self.chooseFolder(startingAt: defaultFolder, forDefault: true) {
+                                defaultFolderPath = url.path
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("Show in Finder") { Self.reveal(defaultFolder) }
                 } label: {
-                    Label(folder?.lastPathComponent ?? Prefs.downloadFolder.lastPathComponent, systemImage: "folder")
+                    Label("Default: \(defaultFolder.lastPathComponent)", systemImage: "folder")
                 }
                 .fixedSize()
-                .help("Where this subscription saves. Reel checks this folder for videos you already have.")
+                .help("Where subscriptions save unless you choose a folder for one. Change a single subscription with the folder menu on its row.")
                 Spacer()
                 Button("Subscribe", systemImage: "plus", action: add)
                     .buttonStyle(.glassProminent)
@@ -130,9 +151,9 @@ struct SubscriptionsView: View {
         notice = nil
         Task {
             do {
-                try await subscriptions.add(link: link, quality: quality, downloadLatest: latest, folder: folder)
+                // New subscriptions follow the default folder until given their own.
+                try await subscriptions.add(link: link, quality: quality, downloadLatest: latest)
                 link = ""
-                folder = nil
             } catch {
                 self.error = error.localizedDescription
             }
@@ -140,16 +161,23 @@ struct SubscriptionsView: View {
         }
     }
 
-    static func chooseFolder(startingAt start: URL? = nil) -> URL? {
+    static func chooseFolder(startingAt start: URL? = nil, forDefault: Bool = false) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Use Folder"
-        panel.message = "Choose where this subscription saves. Videos already in the folder won't be downloaded again."
+        panel.message = forDefault
+            ? "Choose where subscriptions save unless you pick a folder for one."
+            : "Choose where this subscription saves. Videos already in the folder won't be downloaded again."
         panel.directoryURL = start ?? Prefs.downloadFolder
         return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    static func reveal(_ folder: URL) {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(folder)
     }
 
     private func downloadExisting(_ sub: Subscription) {
@@ -184,17 +212,7 @@ struct SubscriptionsView: View {
             }
         }
         Menu("Save To") {
-            Button("Choose Folder…") {
-                if let url = Self.chooseFolder(startingAt: sub.folderURL) { subscriptions.setFolder(sub.id, url) }
-            }
-            if sub.folder != nil {
-                Button("Reel's Download Folder") { subscriptions.setFolder(sub.id, nil) }
-            }
-        }
-        Button("Show Folder in Finder") {
-            let url = sub.folderURL ?? Prefs.downloadFolder
-            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            NSWorkspace.shared.open(url)
+            FolderChoices(sub: sub, defaultFolder: defaultFolder)
         }
         Button("Open in Browser") { if let url = URL(string: sub.link) { NSWorkspace.shared.open(url) } }
         Divider()
@@ -204,9 +222,36 @@ struct SubscriptionsView: View {
     }
 }
 
+/// The folder options for one subscription, shared by its row menu and its context menu.
+private struct FolderChoices: View {
+    @Environment(Subscriptions.self) private var subscriptions
+    let sub: Subscription
+    let defaultFolder: URL
+
+    var body: some View {
+        Button {
+            subscriptions.setFolder(sub.id, nil)
+        } label: {
+            let title = "Default (\(defaultFolder.lastPathComponent))"
+            if sub.folder == nil { Label(title, systemImage: "checkmark") } else { Text(title) }
+        }
+        if let custom = sub.folderURL {
+            Button {} label: { Label(custom.lastPathComponent, systemImage: "checkmark") }
+        }
+        Button("Choose Folder…") {
+            if let url = SubscriptionsView.chooseFolder(startingAt: sub.folderURL ?? defaultFolder) {
+                subscriptions.setFolder(sub.id, url)
+            }
+        }
+        Divider()
+        Button("Show in Finder") { SubscriptionsView.reveal(sub.folderURL ?? defaultFolder) }
+    }
+}
+
 private struct SubscriptionRow: View {
     let sub: Subscription
     let checking: Bool
+    let defaultFolder: URL
     let downloadExisting: () -> Void
 
     var body: some View {
@@ -231,6 +276,18 @@ private struct SubscriptionRow: View {
                 .lineLimit(1)
             }
             Spacer()
+            Menu {
+                FolderChoices(sub: sub, defaultFolder: defaultFolder)
+            } label: {
+                Label((sub.folderURL ?? defaultFolder).lastPathComponent,
+                      systemImage: sub.folder == nil ? "folder" : "folder.fill")
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderless)
+            .fixedSize()
+            .help(sub.folder == nil
+                  ? "Saving to the default folder. Choose a folder just for \(sub.title)."
+                  : "Saving to \(sub.folderURL?.path ?? ""). Only \(sub.title) uses this folder.")
             if checking {
                 ProgressView().controlSize(.small)
             } else if sub.enabled {
@@ -250,7 +307,6 @@ private struct SubscriptionRow: View {
         case 1: parts.append("1 downloaded")
         default: parts.append("\(sub.downloadedCount) downloaded")
         }
-        if let folder = sub.folderURL { parts.append("in \(folder.lastPathComponent)") }
         if let checked = sub.lastChecked {
             parts.append("checked \(checked.formatted(.relative(presentation: .named)))")
         }

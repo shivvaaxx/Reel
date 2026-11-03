@@ -60,10 +60,12 @@ enum FolderIndex {
         for file in files {
             if let link = SourceTag.read(file) {
                 keys.insert(LinkKey.key(for: link))
-            } else if let ffprobe, let link = await embeddedLink(of: file, ffprobe: ffprobe, environment: environment) {
+            } else if let ffprobe, !isCloudOnly(file), await !ProbeMemory.shared.knownUnlinked(file),
+                      let link = await embeddedLink(of: file, ffprobe: ffprobe, environment: environment) {
                 keys.insert(LinkKey.key(for: link))
                 SourceTag.stamp(file, link: link)   // faster next time
-            } else if let id = youTubeID(inName: file.deletingPathExtension().lastPathComponent) {
+            } else if let id = youTubeID(inName: URL(fileURLWithPath: placeholderName(file.lastPathComponent)
+                                                    ?? file.lastPathComponent).deletingPathExtension().lastPathComponent) {
                 keys.insert("youtube:\(id)")
             }
         }
@@ -71,14 +73,38 @@ enum FolderIndex {
     }
 
     static func mediaFiles(in folder: URL) -> [URL] {
+        // Hidden files are included only to catch older iCloud placeholders (".Name.mp4.icloud").
         guard let walker = FileManager.default.enumerator(
-            at: folder, includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey, .ubiquitousItemDownloadingStatusKey],
+            options: [.skipsPackageDescendants]) else { return [] }
         var files: [URL] = []
-        for case let url as URL in walker where mediaExtensions.contains(url.pathExtension.lowercased()) {
-            files.append(url)
+        for case let url as URL in walker {
+            let name = url.lastPathComponent
+            if name.hasPrefix(".") {
+                if url.hasDirectoryPath { walker.skipDescendants(); continue }
+                guard let original = placeholderName(name),
+                      mediaExtensions.contains((original as NSString).pathExtension.lowercased()) else { continue }
+                files.append(url)
+            } else if mediaExtensions.contains(url.pathExtension.lowercased()) {
+                files.append(url)
+            }
         }
         return files
+    }
+
+    /// ".Episode 1 [abc].mp4.icloud" → "Episode 1 [abc].mp4"
+    nonisolated static func placeholderName(_ name: String) -> String? {
+        guard name.hasPrefix("."), name.hasSuffix(".icloud") else { return nil }
+        return String(name.dropFirst().dropLast(".icloud".count))
+    }
+
+    /// In iCloud Drive (or another cloud folder) with only a placeholder on this Mac. Reading
+    /// such a file would download it, so only its name and "Where from" stamp are used.
+    static func isCloudOnly(_ file: URL) -> Bool {
+        if placeholderName(file.lastPathComponent) != nil { return true }
+        guard let status = try? file.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            .ubiquitousItemDownloadingStatus else { return false }
+        return status != .current
     }
 
     /// yt-dlp's --embed-metadata stores the page address in the `purl`/`comment` tags.
@@ -86,9 +112,34 @@ enum FolderIndex {
         guard let result = try? await Shell.run(ffprobe, [
             "-v", "quiet", "-show_entries", "format_tags=purl,comment", "-of", "default=nw=1:nk=1", file.path,
         ], environment: environment), result.status == 0 else { return nil }
-        return result.stdout.split(whereSeparator: \.isNewline).map(String.init)
+        let link = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
             .first { $0.hasPrefix("http") }
+        if link == nil { await ProbeMemory.shared.rememberUnlinked(file) }
+        return link
     }
+}
+
+/// Files already opened and found to carry no source link (videos from elsewhere), so later
+/// checks of a busy folder like Downloads don't open them again. Forgotten if a file changes.
+actor ProbeMemory {
+    static let shared = ProbeMemory()
+    private var unlinked: [String: Date] = [:]
+
+    private static func modified(_ file: URL) -> Date? {
+        try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
+    func knownUnlinked(_ file: URL) -> Bool {
+        guard let seen = unlinked[file.path] else { return false }
+        return seen == Self.modified(file)
+    }
+
+    func rememberUnlinked(_ file: URL) {
+        unlinked[file.path] = Self.modified(file) ?? .distantPast
+    }
+}
+
+extension FolderIndex {
 
     /// "Some Title [dQw4w9WgXcQ]" → "dQw4w9WgXcQ"
     nonisolated static func youTubeID(inName name: String) -> String? {
