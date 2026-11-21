@@ -11,7 +11,7 @@ struct Thumbnail: View {
                 image.resizable().aspectRatio(contentMode: .fill)
             } else {
                 Rectangle()
-                    .fill(.quaternary)
+                    .fill(Look.Colors.cardFill)
                     .overlay {
                         Image(systemName: placeholder)
                             .font(.system(size: width / 5))
@@ -20,10 +20,10 @@ struct Thumbnail: View {
             }
         }
         .frame(width: width, height: width * 9 / 16)
-        .clipShape(.rect(cornerRadius: width > 120 ? 12 : 7))
+        .clipShape(.rect(cornerRadius: width > 120 ? Look.Radius.card : Look.Radius.chip, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: width > 120 ? 12 : 7)
-                .strokeBorder(.separator.opacity(0.6), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: width > 120 ? Look.Radius.card : Look.Radius.chip, style: .continuous)
+                .strokeBorder(Look.Colors.hairline, lineWidth: 0.5)
         }
     }
 }
@@ -77,15 +77,15 @@ struct VideoCard: View {
     @State private var endText = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Look.Spacing.md) {
             summary
             if trimming {
                 trimRow
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .padding(16)
-        .background(.fill.quinary, in: .rect(cornerRadius: 20))
+        .padding(Look.Spacing.xl)
+        .glassSheet()
         .animation(.smooth(duration: 0.25), value: trimming)
     }
 
@@ -108,17 +108,21 @@ struct VideoCard: View {
     }
 
     private var trimRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Look.Spacing.sm) {
             Image(systemName: "scissors").foregroundStyle(.secondary)
             Text("From")
             TextField("0:00", text: $startText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, Look.Spacing.sm)
+                .frame(width: 80, height: 28)
+                .quietCard(cornerRadius: Look.Radius.chip)
                 .monospacedDigit()
             Text("to")
             TextField(info.duration?.clockString ?? "end", text: $endText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 80)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, Look.Spacing.sm)
+                .frame(width: 80, height: 28)
+                .quietCard(cornerRadius: Look.Radius.chip)
                 .monospacedDigit()
             if !clipIsValid {
                 Label("Check the times", systemImage: "exclamationmark.triangle.fill")
@@ -140,7 +144,7 @@ struct VideoCard: View {
     }
 
     private var summary: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: Look.Spacing.lg) {
             Thumbnail(url: info.thumbnail, width: 208)
                 .overlay(alignment: .bottomTrailing) {
                     if let duration = info.duration {
@@ -154,21 +158,19 @@ struct VideoCard: View {
                     }
                 }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Look.Spacing.sm) {
                 Text(info.title)
-                    .font(.title3.weight(.semibold))
+                    .font(Look.Typography.titleSmall)
                     .lineLimit(2)
                 if let uploader = info.uploader {
                     Text(uploader)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 12)
-                HStack(spacing: 10) {
+                Spacer(minLength: Look.Spacing.md)
+                HStack(spacing: Look.Spacing.sm) {
                     QualityPicker(quality: $quality)
-                    Toggle(isOn: $trimming) {
-                        Label("Trim", systemImage: "scissors")
-                    }
-                    .toggleStyle(.button)
+                    Button { trimming.toggle() } label: { Label("Trim", systemImage: "scissors") }
+                    .buttonStyle(.quietChip(selected: trimming))
                     .help("Download only part of the video")
                     .disabled(info.isLive)
                     Spacer()
@@ -196,18 +198,18 @@ struct GalleryCard: View {
     let onDownload: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.quaternary)
+        HStack(spacing: Look.Spacing.lg) {
+            RoundedRectangle(cornerRadius: Look.Radius.card, style: .continuous)
+                .fill(Look.Colors.cardFill)
                 .frame(width: 112, height: 63)
                 .overlay {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.title)
                         .foregroundStyle(.secondary)
                 }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Look.Spacing.hair) {
                 Text("\(Prefs.siteName(for: link)) Post")
-                    .font(.title3.weight(.semibold))
+                    .font(Look.Typography.titleSmall)
                 Text("Saves every photo and video in the post.")
                     .foregroundStyle(.secondary)
             }
@@ -220,8 +222,8 @@ struct GalleryCard: View {
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
         }
-        .padding(16)
-        .background(.fill.quinary, in: .rect(cornerRadius: 20))
+        .padding(Look.Spacing.xl)
+        .glassSheet()
     }
 }
 
@@ -237,12 +239,12 @@ struct PlaylistCard: View {
     private var allSelected: Bool { selection.count == info.entries.count }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: Look.Spacing.md) {
+            HStack(spacing: Look.Spacing.md) {
                 Thumbnail(url: info.thumbnail, width: 112)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Look.Spacing.hair) {
                     Text(info.title)
-                        .font(.title3.weight(.semibold))
+                        .font(Look.Typography.titleSmall)
                         .lineLimit(1)
                     Text(countText)
                         .foregroundStyle(.secondary)
@@ -254,14 +256,14 @@ struct PlaylistCard: View {
                 Button(allSelected ? "Deselect All" : "Select All") {
                     selection = allSelected ? [] : Set(info.entries.map(\.id))
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.quietChip)
             }
 
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(info.entries.enumerated()), id: \.element.id) { index, entry in
                         Toggle(isOn: binding(for: entry.id)) {
-                            HStack(spacing: 10) {
+                            HStack(spacing: Look.Spacing.sm) {
                                 Text("\(index + 1)")
                                     .font(.callout.monospacedDigit())
                                     .foregroundStyle(.tertiary)
@@ -288,9 +290,9 @@ struct PlaylistCard: View {
                 }
             }
             .frame(maxHeight: 200)
-            .background(.background.opacity(0.5), in: .rect(cornerRadius: 10))
+            .quietCard()
 
-            HStack(spacing: 10) {
+            HStack(spacing: Look.Spacing.sm) {
                 QualityPicker(quality: $quality)
                 Spacer()
                 Button(action: onDownload) {
@@ -304,8 +306,8 @@ struct PlaylistCard: View {
                 .disabled(selection.isEmpty)
             }
         }
-        .padding(16)
-        .background(.fill.quinary, in: .rect(cornerRadius: 20))
+        .padding(Look.Spacing.xl)
+        .glassSheet()
     }
 
     private var countText: String {

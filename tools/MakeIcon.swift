@@ -1,14 +1,17 @@
-// Renders Reel's app icon: a pink-to-indigo gradient tile with a white download
-// arrow that has a play button cut into it. Drawn natively from the Figma design
+// Renders Reel's app icon: a matte cream tile with a charcoal download arrow that
+// has a play button cut into it (the app's canvas colours; charcoal tile, cream
+// arrow in dark mode). Drawn natively from the Figma design
 // ("Reels — macOS App Icon"), fitted to Apple's macOS icon grid (an 824 pt
 // continuous-corner body on a 1024 pt canvas).
 //
 // Usage: swift tools/MakeIcon.swift <out.iconset> [preview.png]
 //        swift tools/MakeIcon.swift --icon-composer <out.icon>
+//        swift tools/MakeIcon.swift --previews <light.png> <dark.png>
 //
 // The second form writes an Icon Composer document for macOS 26 (compiled by actool
-// into Assets.car). It carries the appearance variants: a white arrow normally, a
-// black arrow in dark mode, and a tintable arrow for tinted icons.
+// into Assets.car). It carries the appearance variants: cream tile with a charcoal
+// arrow normally, charcoal tile with a cream arrow in dark mode, and a tintable
+// arrow for tinted icons.
 
 import AppKit
 import SwiftUI
@@ -21,6 +24,10 @@ let gridBody: CGFloat = 824.0 / 1024.0     // body size as a fraction of the can
 func rgba(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
     CGColor(srgbRed: r, green: g, blue: b, alpha: a)
 }
+/// The app's canvas colours (Look.Colors.canvas in Sources/Reel/Look.swift).
+let cream = rgba(0.96, 0.94, 0.90)
+let charcoal = rgba(0.11, 0.10, 0.09)
+
 func hex(_ v: UInt32) -> CGColor {
     rgba(CGFloat((v >> 16) & 0xFF) / 255, CGFloat((v >> 8) & 0xFF) / 255, CGFloat(v & 0xFF) / 255)
 }
@@ -74,7 +81,7 @@ func innerShadow(_ ctx: CGContext, _ path: CGPath, dy: CGFloat, blur: CGFloat, c
     ctx.restoreGState()
 }
 
-func render(pixels: Int) -> CGImage {
+func render(pixels: Int, dark: Bool = false) -> CGImage {
     let size = CGFloat(pixels)
     let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
                         space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -94,38 +101,34 @@ func render(pixels: Int) -> CGImage {
 
     // 1. Soft drop shadow (spread −5, y +12, blur 10).
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -12 * unit), blur: 20 * unit, color: rgba(0.16, 0.06, 0.32, 0.22))
-    ctx.setFillColor(rgba(0.16, 0.06, 0.32, 1))
+    ctx.setShadow(offset: CGSize(width: 0, height: -12 * unit), blur: 20 * unit, color: rgba(0, 0, 0, 0.18))
+    ctx.setFillColor(rgba(0, 0, 0, 1))
     ctx.addPath(tilePath(designTile.insetBy(dx: 5, dy: 5))); ctx.fillPath()
     ctx.restoreGState()
 
-    // 2. Gradient body.
+    // 2. Solid matte body.
     ctx.saveGState()
-    ctx.addPath(tile); ctx.clip()
-    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                              colors: [hex(0xFC7989), hex(0xD449D7), hex(0x8044ED), hex(0x4731B9)] as CFArray,
-                              locations: [0, 0.38, 0.72, 1])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: 62.0183, y: 93.8558), end: CGPoint(x: 403.135, y: 389.49),
-                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    ctx.setFillColor(dark ? charcoal : cream)
+    ctx.addPath(tile); ctx.fillPath()
     ctx.restoreGState()
 
     // 3. Light catching the top edge, and depth along the bottom.
-    innerShadow(ctx, tile, dy: 2, blur: 1.5, color: rgba(1, 1, 1, 0.32), unit: unit)
-    innerShadow(ctx, tile, dy: -5, blur: 6, color: rgba(0.16, 0.03, 0.40, 0.22), unit: unit)
+    innerShadow(ctx, tile, dy: 2, blur: 1.5, color: rgba(1, 1, 1, 0.6), unit: unit)
+    innerShadow(ctx, tile, dy: -5, blur: 6, color: rgba(0, 0, 0, 0.08), unit: unit)
 
     // 4. Hairline rim.
     ctx.saveGState()
     ctx.addPath(tile); ctx.clip()
     ctx.addPath(tile)
-    ctx.setStrokeColor(rgba(1, 1, 1, 0.24))
+    ctx.setStrokeColor(rgba(0, 0, 0, 0.07))
     ctx.setLineWidth(2)   // centred on the edge, so 1 unit shows inside the clip
     ctx.strokePath()
     ctx.restoreGState()
 
     // 5. Symbol with its shadow.
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -6 * unit), blur: 10 * unit, color: rgba(0.24, 0.04, 0.45, 0.22))
-    ctx.setFillColor(rgba(1, 1, 1, 1))
+    ctx.setShadow(offset: CGSize(width: 0, height: -6 * unit), blur: 10 * unit, color: rgba(0, 0, 0, 0.12))
+    ctx.setFillColor(dark ? cream : charcoal)
     ctx.addPath(symbolPath()); ctx.fillPath(using: .evenOdd)
     ctx.restoreGState()
 
@@ -139,24 +142,6 @@ func writePNG(_ image: CGImage, to url: URL) throws {
 }
 
 // MARK: - Icon Composer document
-
-/// The full-bleed gradient background (the system applies the icon shape and edges).
-func renderBackground(pixels: Int) -> CGImage {
-    let size = CGFloat(pixels)
-    let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
-                        space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-    let unit = size / designTile.width
-    ctx.translateBy(x: 0, y: size)
-    ctx.scaleBy(x: unit, y: -unit)
-    ctx.translateBy(x: -designTile.minX, y: -designTile.minY)
-    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                              colors: [hex(0xFC7989), hex(0xD449D7), hex(0x8044ED), hex(0x4731B9)] as CFArray,
-                              locations: [0, 0.38, 0.72, 1])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: 62.0183, y: 93.8558), end: CGPoint(x: 403.135, y: 389.49),
-                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-    return ctx.makeImage()!
-}
 
 /// The arrow as SVG on the tile's full canvas, so it lands exactly where the design puts it.
 let arrowSVG = """
@@ -173,8 +158,8 @@ let iconJSON = """
       "layers" : [
         {
           "fill-specializations" : [
-            { "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } },
-            { "appearance" : "dark", "value" : { "solid" : "srgb:0.00000,0.00000,0.00000,1.00000" } }
+            { "value" : { "solid" : "srgb:0.11000,0.10000,0.09000,1.00000" } },
+            { "appearance" : "dark", "value" : { "solid" : "srgb:0.96000,0.94000,0.90000,1.00000" } }
           ],
           "glass" : true,
           "image-name" : "arrow.svg",
@@ -183,18 +168,11 @@ let iconJSON = """
       ],
       "shadow" : { "kind" : "layer-color", "opacity" : 0.5 },
       "translucency" : { "enabled" : false, "value" : 0 }
-    },
-    {
-      "layers" : [
-        {
-          "glass" : false,
-          "image-name" : "background.png",
-          "name" : "background"
-        }
-      ],
-      "shadow" : { "kind" : "none", "opacity" : 0 },
-      "translucency" : { "enabled" : false, "value" : 0 }
     }
+  ],
+  "fill-specializations" : [
+    { "value" : { "solid" : "srgb:0.96000,0.94000,0.90000,1.00000" } },
+    { "appearance" : "dark", "value" : { "solid" : "srgb:0.11000,0.10000,0.09000,1.00000" } }
   ],
   "supported-platforms" : {
     "squares" : [ "macOS" ]
@@ -204,12 +182,18 @@ let iconJSON = """
 """
 
 let args = CommandLine.arguments
+if args.count >= 4, args[1] == "--previews" {
+    // The README's light and dark icons (docs/icon.png, docs/icon-dark.png).
+    try writePNG(render(pixels: 512), to: URL(fileURLWithPath: args[2]))
+    try writePNG(render(pixels: 512, dark: true), to: URL(fileURLWithPath: args[3]))
+    print("Wrote \(args[2]) and \(args[3])")
+    exit(0)
+}
 if args.count >= 3, args[1] == "--icon-composer" {
     let doc = URL(fileURLWithPath: args[2])
     let assets = doc.appendingPathComponent("Assets")
     try? FileManager.default.removeItem(at: doc)
     try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
-    try writePNG(renderBackground(pixels: 1024), to: assets.appendingPathComponent("background.png"))
     try arrowSVG.write(to: assets.appendingPathComponent("arrow.svg"), atomically: true, encoding: .utf8)
     try iconJSON.write(to: doc.appendingPathComponent("icon.json"), atomically: true, encoding: .utf8)
     print("Wrote \(doc.path)")

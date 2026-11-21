@@ -38,15 +38,22 @@ struct LibraryView: View {
                         LibraryRow(item: item) { trash([item.id]) }
                             .tag(item.id)
                             .contextMenu { menu(for: item) }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: Look.Spacing.xs, leading: Look.Spacing.md,
+                                                      bottom: Look.Spacing.xs, trailing: Look.Spacing.md))
                     }
                 }
-                .listStyle(.inset)
+                .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .contextMenu(forSelectionType: LibraryItem.ID.self) { _ in
                 } primaryAction: { ids in
                     library.items.filter { ids.contains($0.id) }.forEach { $0.open() }
                 }
                 .onDeleteCommand { library.remove(selection) }
+                .padding(.vertical, Look.Spacing.sm)
+                .glassSheet()
+                .padding(.horizontal, Look.Spacing.canvas)
+                .padding(.bottom, Look.Spacing.canvas)
             }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search Library")
@@ -58,23 +65,27 @@ struct LibraryView: View {
         .safeAreaInset(edge: .top) {
             if library.items.count > 0 {
                 HStack {
-                    Picker("Site", selection: $site) {
-                        ForEach(sites, id: \.self) { Text($0).tag($0) }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Look.Spacing.xs) {
+                            ForEach(sites, id: \.self) { s in
+                                Button(s) { site = s }
+                                    .buttonStyle(.quietChip(selected: site == s))
+                            }
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
                     Spacer()
                     Text(summary)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     if library.items.contains(where: { !$0.isAvailable }) {
                         Button("Remove Missing") { library.removeMissing() }
+                            .buttonStyle(.quietChip)
                             .help("Remove items whose files were moved or deleted")
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+                .padding(.horizontal, Look.Spacing.canvas)
+                .padding(.top, Look.Spacing.lg)
+                .padding(.bottom, Look.Spacing.md)
             }
         }
     }
@@ -129,13 +140,13 @@ private struct LibraryRow: View {
     let trash: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Look.Spacing.md) {
             Thumbnail(url: item.thumbnailURL, width: 96,
                       placeholder: item.isGallery ? "photo.on.rectangle" : "play.rectangle")
                 .opacity(item.isAvailable ? 1 : 0.45)
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
-                    .font(.body.weight(.medium))
+                    .font(Look.Typography.label)
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     Text(item.site)
@@ -160,16 +171,14 @@ private struct LibraryRow: View {
             }
             Spacer()
             if item.isAvailable {
-                HStack(spacing: 10) {
+                HStack(spacing: Look.Spacing.xs) {
                     Button("Show in Finder", systemImage: "magnifyingglass") { item.reveal() }
                         .help("Show in Finder")
                     Button("Move to Trash", systemImage: "trash", action: trash)
                         .help("Move to Trash")
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
+                .buttonStyle(.quietChip)
             }
         }
         .padding(.vertical, 4)

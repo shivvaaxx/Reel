@@ -43,6 +43,8 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 540)
+        .deskBackground()
+        .clearToolbar()
         .navigationTitle("Reel")
         .navigationSubtitle(section == .downloads ? subtitle : "")
         .background(WindowIdentifier())
@@ -91,9 +93,9 @@ struct ContentView: View {
         .overlay { setupOverlay }
         .overlay {
             if dropTargeted {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: Look.Radius.sheet, style: .continuous)
                     .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8, 6]))
-                    .padding(8)
+                    .padding(Look.Spacing.sm)
                     .allowsHitTesting(false)
             }
         }
@@ -148,21 +150,21 @@ struct ContentView: View {
     // MARK: Downloads pane
 
     private var downloadsPane: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: Look.Spacing.lg) {
+            VStack(alignment: .leading, spacing: Look.Spacing.md) {
                 linkBar
                 lookupArea
             }
-            .padding(20)
             .animation(.smooth(duration: 0.3), value: lookupKey)
 
             downloads
         }
+        .padding(Look.Spacing.canvas)
     }
 
     private var linkBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: Look.Spacing.sm) {
+            HStack(spacing: Look.Spacing.sm) {
                 Image(systemName: "link")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -184,12 +186,12 @@ struct ContentView: View {
                     .help("Clear")
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 13)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .padding(.horizontal, Look.Spacing.xl)
+            .padding(.vertical, Look.Spacing.md + Look.Spacing.hair)
+            .glassPill()
 
             if clipboardHasLink, link.isEmpty, case .idle = lookup {
-                HStack(spacing: 8) {
+                HStack(spacing: Look.Spacing.sm) {
                     Button {
                         if let copied = Clipboard.readLink() {
                             link = copied
@@ -276,16 +278,18 @@ struct ContentView: View {
             .frame(maxHeight: .infinity)
         } else {
             List {
-                SwiftUI.Section {
-                    ForEach(queue.jobs) { job in
-                        DownloadRow(job: job)
-                    }
-                } header: {
-                    Text("Downloads")
+                ForEach(queue.jobs) { job in
+                    DownloadRow(job: job)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: Look.Spacing.xs, leading: Look.Spacing.md,
+                                                  bottom: Look.Spacing.xs, trailing: Look.Spacing.md))
                 }
             }
-            .listStyle(.inset)
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .padding(.vertical, Look.Spacing.sm)
+            .glassSheet()
             .animation(.default, value: queue.jobs.map(\.id))
         }
     }
@@ -296,7 +300,7 @@ struct ContentView: View {
         case .installing, .failed:
             EngineSetupView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.ultraThinMaterial)
+                .deskBackground()
                 .transition(.opacity)
         default:
             EmptyView()

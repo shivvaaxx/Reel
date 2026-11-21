@@ -18,7 +18,8 @@ struct SubscriptionsView: View {
     var body: some View {
         VStack(spacing: 0) {
             addBar
-                .padding(20)
+                .padding([.horizontal, .top], Look.Spacing.canvas)
+                .padding(.bottom, Look.Spacing.lg)
             if subscriptions.items.isEmpty {
                 ContentUnavailableView {
                     Label("No Subscriptions", systemImage: "dot.radiowaves.left.and.right")
@@ -27,37 +28,49 @@ struct SubscriptionsView: View {
                 }
                 .frame(maxHeight: .infinity)
             } else {
-                List(selection: $selection) {
-                    Section {
-                        ForEach(subscriptions.items) { sub in
-                            SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id),
-                                            defaultFolder: defaultFolder) {
-                                downloadExisting(sub)
-                            }
-                            .tag(sub.id)
-                            .contextMenu { menu(for: sub) }
+                VStack(spacing: Look.Spacing.xs) {
+                    HStack {
+                        Text("Checks every \(hoursText)")
+                        Spacer()
+                        Picker("Check every", selection: $hours) {
+                            Text("Hour").tag(1.0)
+                            Text("3 hours").tag(3.0)
+                            Text("6 hours").tag(6.0)
+                            Text("12 hours").tag(12.0)
+                            Text("Day").tag(24.0)
                         }
-                    } header: {
-                        HStack {
-                            Text("Checks every \(hoursText)")
-                            Spacer()
-                            Picker("Check every", selection: $hours) {
-                                Text("Hour").tag(1.0)
-                                Text("3 hours").tag(3.0)
-                                Text("6 hours").tag(6.0)
-                                Text("12 hours").tag(12.0)
-                                Text("Day").tag(24.0)
+                        .labelsHidden()
+                        .fixedSize()
+                        Button("Check Now") { subscriptions.checkAll() }
+                            .buttonStyle(.quietChip)
+                    }
+                    .font(Look.Typography.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Look.Spacing.lg)
+                    .padding(.top, Look.Spacing.md)
+                    List(selection: $selection) {
+                        Section {
+                            ForEach(subscriptions.items) { sub in
+                                SubscriptionRow(sub: sub, checking: subscriptions.checking.contains(sub.id),
+                                                defaultFolder: defaultFolder) {
+                                    downloadExisting(sub)
+                                }
+                                .tag(sub.id)
+                                .contextMenu { menu(for: sub) }
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: Look.Spacing.xs, leading: Look.Spacing.md,
+                                                          bottom: Look.Spacing.xs, trailing: Look.Spacing.md))
                             }
-                            .labelsHidden()
-                            .fixedSize()
-                            Button("Check Now") { subscriptions.checkAll() }
-                                .buttonStyle(.link)
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .onDeleteCommand { subscriptions.remove(selection) }
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
-                .onDeleteCommand { subscriptions.remove(selection) }
+                .padding(.bottom, Look.Spacing.sm)
+                .glassSheet()
+                .padding(.horizontal, Look.Spacing.canvas)
+                .padding(.bottom, Look.Spacing.canvas)
             }
         }
     }
@@ -82,9 +95,9 @@ struct SubscriptionsView: View {
                     .onSubmit(add)
                 if adding { ProgressView().controlSize(.small) }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 13)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .padding(.horizontal, Look.Spacing.xl)
+            .padding(.vertical, Look.Spacing.md + Look.Spacing.hair)
+            .glassPill()
 
             HStack(spacing: 12) {
                 QualityPicker(quality: $quality)
@@ -255,10 +268,10 @@ private struct SubscriptionRow: View {
     let downloadExisting: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Look.Spacing.md) {
             Thumbnail(url: sub.thumbnailURL, width: 96, placeholder: "dot.radiowaves.left.and.right")
                 .opacity(sub.enabled ? 1 : 0.45)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Look.Spacing.xs) {
                 Text(sub.title).font(.body.weight(.medium)).lineLimit(1)
                 Group {
                     if let error = sub.lastError {
@@ -297,7 +310,7 @@ private struct SubscriptionRow: View {
                     .help("Download the videos already in \(sub.title)")
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Look.Spacing.xs)
     }
 
     private var detail: String {
