@@ -4,6 +4,8 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-21
+
 ### Changed
 - **A fresh look.** The window is one calm, matte surface (cream in light mode, charcoal in dark) with the link field, video cards and lists floating on it as glass panels. The Library's site filter is now a row of buttons, and row actions are quieter.
 - **A new app icon** to match: a cream tile with a charcoal download arrow, switching to charcoal with a cream arrow in dark mode.
