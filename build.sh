@@ -86,10 +86,15 @@ else
   echo "Skipping app extensions (needs Xcode and a signing certificate)."
 fi
 
-# Developer ID builds get the hardened runtime and a secure timestamp, which Apple's
-# notarization requires (make-dmg.sh then notarizes). Other builds skip both.
-if [[ "$IDENTITY" != "-" ]] && security find-identity -v -p codesigning | grep "$IDENTITY" | grep -q "Developer ID Application"; then
-  SIGN_FLAGS=(--options runtime --timestamp)
+# Real certificates get the hardened runtime, which Apple's notarization requires.
+# Developer ID builds also get a secure timestamp. Apple Development builds can still be
+# notarized: make-dmg.sh re-signs them with Developer ID through Xcode's cloud signing.
+if [[ "$IDENTITY" != "-" ]]; then
+  if security find-identity -v -p codesigning | grep "$IDENTITY" | grep -q "Developer ID Application"; then
+    SIGN_FLAGS=(--options runtime --timestamp)
+  else
+    SIGN_FLAGS=(--options runtime --timestamp=none)
+  fi
   for appex in "$APP"/Contents/PlugIns/*.appex(N) "$APP"/Contents/Extensions/*.appex(N); do
     codesign --force "${SIGN_FLAGS[@]}" --preserve-metadata=entitlements --sign "$IDENTITY" "$appex"
   done
