@@ -195,4 +195,5 @@ struct JobRecord: Codable {
     var downloadedBytes: Double
     var expectedBytes: Double?
     var addedAt: Date
+    var nameSuffix: String? = nil
 }

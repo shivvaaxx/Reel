@@ -94,6 +94,18 @@ struct ArgumentTests {
         #expect(args.contains("m4a"))
     }
 
+    @Test func secondCopiesAreNamedByQuality() {
+        var o = options(.p2160)
+        #expect(o.selectionArguments(for: "https://youtu.be/x").contains("%(title).180B.%(ext)s"))
+        o.nameSuffix = o.qualitySuffix
+        #expect(o.selectionArguments(for: "https://youtu.be/x").contains("%(title).180B (4K).%(ext)s"))
+        #expect(options(.audio).qualitySuffix == " (Audio)")
+        #expect(options(.best).qualitySuffix == " (Best)")
+        var odd = options(.p720)
+        odd.nameSuffix = " (100%)"
+        #expect(odd.selectionArguments(for: "https://youtu.be/x").contains("%(title).180B (100%%).%(ext)s"))
+    }
+
     @Test func clipsUseDownloadSections() {
         var o = options(.best)
         o.clipStart = 80

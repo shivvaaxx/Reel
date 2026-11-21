@@ -50,6 +50,8 @@ final class DownloadJob: Identifiable {
     @ObservationIgnored var currentFormat: String?
     @ObservationIgnored var currentStreamTotal: Double = 0
     @ObservationIgnored var plannedFilename: String?
+    /// yt-dlp found the final file already on disk and skipped the download.
+    @ObservationIgnored var skippedExisting = false
     @ObservationIgnored var lastError: String?
     @ObservationIgnored var stopReason: StopReason?
 
@@ -297,6 +299,7 @@ final class DownloadQueue {
             var options = DownloadOptions.current(quality: Quality(rawValue: record.quality) ?? .best)
             options.clipStart = record.clipStart
             options.clipEnd = record.clipEnd
+            options.nameSuffix = record.nameSuffix
             let job = DownloadJob(id: record.id, link: record.link, kind: record.isGallery ? .gallery : .video,
                                   title: record.title,
                                   thumbnail: record.thumbnail.flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : URL(string: $0) },
@@ -339,7 +342,8 @@ final class DownloadQueue {
             quality: job.options.quality.rawValue, clipStart: job.options.clipStart, clipEnd: job.options.clipEnd,
             state: state, message: message, file: job.fileURL?.path,
             galleryFiles: job.galleryFiles.map(\.path), fileSize: job.fileSize,
-            downloadedBytes: job.downloadedBytes, expectedBytes: job.expectedBytes, addedAt: job.addedAt
+            downloadedBytes: job.downloadedBytes, expectedBytes: job.expectedBytes, addedAt: job.addedAt,
+            nameSuffix: job.options.nameSuffix
         )
     }
 
@@ -567,6 +571,7 @@ final class DownloadQueue {
         job.currentFormat = nil
         job.galleryFiles = []
         job.conversionChecked = false
+        job.skippedExisting = false
 
         job.activeConnections = nil
 
@@ -585,7 +590,14 @@ final class DownloadQueue {
     /// Anything the accelerator can't handle falls back to a normal yt-dlp download.
     private func runAccelerated(_ job: DownloadJob) async {
         do {
-            guard let plan = try await AcceleratedPlan.make(for: job, engine: engine) else {
+            var plan = try await AcceleratedPlan.make(for: job, engine: engine)
+            // The file already exists, so this is another copy of the video (usually at another
+            // quality): give it its own name. A resumed download keeps its name.
+            if let existing = plan, needsOwnName(job, finalPath: existing.finalPath, streams: existing.streams) {
+                job.options.nameSuffix = job.options.qualitySuffix
+                plan = try await AcceleratedPlan.make(for: job, engine: engine)
+            }
+            guard let plan else {
                 if job.stopReason != nil { finish(job, exitStatus: 0) } else { launchProcess(job, infoFile: nil) }
                 return
             }
@@ -630,6 +642,15 @@ final class DownloadQueue {
                 launchProcess(job, infoFile: nil)
             }
         }
+    }
+
+    /// Whether the planned file is already on disk from an earlier, separate download.
+    private func needsOwnName(_ job: DownloadJob, finalPath: String, streams: [SegmentedDownloader.Stream]) -> Bool {
+        let fm = FileManager.default
+        guard job.options.nameSuffix == nil, !job.options.isClip, fm.fileExists(atPath: finalPath) else { return false }
+        // Partial or finished streams mean this job was already under way.
+        return !streams.contains { fm.fileExists(atPath: $0.partURL.path)
+            || (streams.count > 1 && fm.fileExists(atPath: $0.destination.path)) }
     }
 
     private func launchProcess(_ job: DownloadJob, infoFile: URL?) {
@@ -735,6 +756,9 @@ final class DownloadQueue {
             if job.thumbnail == nil { job.thumbnail = URL(string: String(line.dropFirst(4))) }
         } else if line.hasPrefix("@@N ") {
             job.plannedFilename = String(line.dropFirst(4))
+        } else if line.hasSuffix(" has already been downloaded"), let planned = job.plannedFilename,
+                  line == "[download] \(planned) has already been downloaded" {
+            job.skippedExisting = true
         } else if line.hasPrefix("@@F ") {
             job.fileURL = URL(fileURLWithPath: String(line.dropFirst(4)))
         } else if line.hasPrefix("ERROR:") {
@@ -814,6 +838,15 @@ final class DownloadQueue {
             let succeeded = job.kind == .gallery
                 ? (exitStatus == 0 && !job.galleryFiles.isEmpty)
                 : exitStatus == 0
+            // Without the accelerator, yt-dlp itself finds the earlier copy and skips the
+            // download: start again under a name of its own.
+            if succeeded && job.kind == .video && job.skippedExisting && job.plan == nil
+                && job.options.nameSuffix == nil && !job.options.isClip {
+                job.options.nameSuffix = job.options.qualitySuffix
+                job.log.append("A file with this name already exists; saving this copy as …\(job.options.qualitySuffix).")
+                start(job)
+                return
+            }
             if succeeded && job.kind == .video && job.options.usesHEVCConversion(for: job.link),
                let file = job.fileURL, !job.conversionChecked {
                 job.conversionChecked = true
