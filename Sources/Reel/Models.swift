@@ -53,8 +53,15 @@ struct DownloadOptions {
     var convertHighResToHEVC: Bool = true
     /// Maximum speed in MB/s; nil = unlimited.
     var rateLimit: Double? = nil
+    /// Added to the file name when a copy of this video at another quality already exists,
+    /// e.g. " (4K)", so yt-dlp downloads it instead of skipping it as already downloaded.
+    var nameSuffix: String? = nil
 
     var isClip: Bool { clipStart != nil || clipEnd != nil }
+
+    var qualitySuffix: String {
+        " (" + (quality == .audio ? "Audio" : quality == .best ? "Best" : quality.label) + ")"
+    }
 
     private var isHighRes: Bool { [.best, .p2160, .p1440].contains(quality) }
 
@@ -149,7 +156,9 @@ struct DownloadOptions {
             args += ["--download-sections", String(format: "*%.2f-", start) + end,
                      "-o", "%(title).160B (\(Self.clock(start))–\(clipEnd.map(Self.clock) ?? "end")).%(ext)s"]
         } else {
-            args += ["-o", "%(title).180B.%(ext)s"]
+            // % is yt-dlp's template character, so a suffix escapes it.
+            let suffix = (nameSuffix ?? "").replacingOccurrences(of: "%", with: "%%")
+            args += ["-o", "%(title).180B\(suffix).%(ext)s"]
         }
 
         switch quality {
