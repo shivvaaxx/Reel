@@ -322,3 +322,35 @@ struct TitleMatchTests {
                 != FolderIndex.titleKey("Celebrity Master Chef (2026) Tamil S01 EP02"))
     }
 }
+
+@Suite("Links from other apps")
+struct HandoffTests {
+    @Test("Links that reach this Mac or a private network are refused", arguments: [
+        "http://localhost/", "http://LOCALHOST:8080/x", "http://printer.local/", "http://router.lan/",
+        "http://127.0.0.1/", "http://127.1/", "http://2130706433/", "http://0x7f.0.0.1/", "http://0177.0.0.1/",
+        "http://10.0.0.1/", "http://172.16.5.4/", "http://192.168.1.1/admin", "http://169.254.169.254/latest",
+        "http://100.64.0.1/", "http://0.0.0.0/", "http://[::1]/", "http://[fe80::1]/", "http://[fd00::1]/",
+        "http://[::ffff:127.0.0.1]/", "ftp://example.com/", "file:///etc/passwd",
+    ])
+    func refused(_ link: String) {
+        #expect(!Handoff.isPublicWebLink(link))
+    }
+
+    @Test("Public links still work", arguments: [
+        "https://www.youtube.com/watch?v=x", "https://youtu.be/x", "http://172.32.0.1/", "https://8.8.8.8/",
+        "https://[2606:4700::1111]/", "https://vimeo.com/123",
+    ])
+    func allowed(_ link: String) {
+        #expect(Handoff.isPublicWebLink(link))
+    }
+
+    @Test func signatureCheckRejectsUnsignedAndWrongTeam() async throws {
+        let unsigned = FileManager.default.temporaryDirectory.appendingPathComponent("reel-unsigned-\(UUID().uuidString)")
+        try "#!/bin/sh\n".write(to: unsigned, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: unsigned) }
+        #expect(await !Engine.isSigned(unsigned, byTeam: "KU3N25YGLU"))
+        // A real Apple-signed binary, but not from the tool's team.
+        #expect(await !Engine.isSigned(URL(fileURLWithPath: "/usr/bin/codesign"), byTeam: "KU3N25YGLU"))
+        #expect(await !Engine.isSigned(unsigned, byTeam: "bad\" or \"1"))
+    }
+}

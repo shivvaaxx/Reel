@@ -24,9 +24,9 @@ You'll get a reply within 7 days. Once a fix ships, the advisory is published an
 
 ## What's in scope
 
-- **The app:** Reel itself, its Share, Safari and Shortcuts extensions, and its `reel://` link handler.
+- **The app:** Reel itself, its Share, Safari and Shortcuts extensions, and its `reel://` link handler, which refuses links to this Mac or a private network.
 - **Updates:** Reel's update feed (`appcast.xml`) and the release DMGs. Releases are signed with Developer ID and notarized by Apple, and updates are verified with an EdDSA signature before they install.
-- **The download tools:** on first launch Reel downloads FFmpeg, Deno and uv over HTTPS from their publishers, then installs yt-dlp and gallery-dl from PyPI with uv. A way to make Reel fetch or run something other than those tools is in scope.
+- **The download tools:** on first launch Reel downloads FFmpeg, Deno and uv over HTTPS from their publishers and installs each only if it carries a valid Developer ID signature from that publisher's Apple team. It then installs yt-dlp and gallery-dl from PyPI with uv. A way to make Reel fetch or run something other than those tools is in scope.
 - **Your data:** if you allow it, Reel reads your browser's sign-in for the sites you choose. It's passed only to the local download tools. Anything that would send it, or your download history, off your Mac is in scope.
 
 ## What's not in scope

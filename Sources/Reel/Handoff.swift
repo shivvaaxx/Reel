@@ -22,7 +22,8 @@ enum Handoff {
 
         switch url.host?.lowercased() {
         case "download":
-            let links = items.filter { $0.name == "url" }.compactMap(\.value).filter(isWebLink)
+            // Any web page can open a reel:// link, so it may not reach this Mac or its network.
+            let links = items.filter { $0.name == "url" }.compactMap(\.value).filter(isPublicWebLink)
             let quality = value("quality").flatMap(Quality.init(rawValue:))
             let clip = value("clip").flatMap(parseClip)
             send(links, quality: quality, clip: clip)
@@ -55,6 +56,33 @@ enum Handoff {
     static func isWebLink(_ text: String) -> Bool {
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
         return (scheme == "http" || scheme == "https") && url.host != nil
+    }
+
+    /// A web link whose host isn't this Mac or a private network (router pages, local servers).
+    /// Names that resolve to a private address are not caught; this stops the direct cases.
+    static func isPublicWebLink(_ text: String) -> Bool {
+        guard isWebLink(text), let host = URL(string: text)?.host?.lowercased() else { return false }
+        let name = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
+        if name == "localhost" || name.hasSuffix(".localhost") || name.hasSuffix(".local")
+            || name.hasSuffix(".internal") || name.hasSuffix(".lan") || name.hasSuffix(".home.arpa") { return false }
+        let labels = name.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        let numeric = labels.allSatisfy { $0.range(of: #"^(0x[0-9a-f]*|[0-9]+)$"#, options: .regularExpression) != nil }
+        if numeric {
+            // Only plain dotted-decimal addresses pass; hex, octal and shortened forms
+            // (0x7f.1, 0177.0.0.1, 127.1) can all mean this Mac.
+            let parts = labels.compactMap { Int($0) }
+            guard labels.count == 4, parts.count == 4, labels.allSatisfy({ $0 == "0" || !$0.hasPrefix("0") }),
+                  parts.allSatisfy({ (0...255).contains($0) }) else { return false }
+            let a = parts[0], b = parts[1]
+            return !(a == 0 || a == 10 || a == 127 || (a == 169 && b == 254) || (a == 172 && (16...31).contains(b))
+                     || (a == 192 && b == 168) || (a == 100 && (64...127).contains(b)) || a >= 224)
+        }
+        if name.contains(":") {   // IPv6
+            return !(name == "::" || name == "::1" || name.hasPrefix("fc") || name.hasPrefix("fd")
+                     || name.hasPrefix("fe8") || name.hasPrefix("fe9") || name.hasPrefix("fea") || name.hasPrefix("feb")
+                     || name.hasPrefix("::ffff:"))
+        }
+        return true
     }
 
     static func parseClip(_ text: String) -> (Double?, Double?)? {
