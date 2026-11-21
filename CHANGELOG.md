@@ -4,6 +4,10 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+### Security
+- Reel now installs FFmpeg, Deno and uv only if they're signed by their publishers, so a tampered download is refused instead of run.
+- Links sent through `reel://` (from web pages, the bookmarklet or scripts) can no longer point at this Mac or your local network.
+
 ## [1.4.0] - 2026-11-21
 
 ### Changed

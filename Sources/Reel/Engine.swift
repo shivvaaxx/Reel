@@ -9,6 +9,8 @@ enum EngineError: LocalizedError {
     case lookupFailed(String)
     case noVideo
     case galleryFailed(String)
+    /// The downloaded tool isn't signed by its publisher, so it was not installed.
+    case untrusted(String)
     /// Blocked in this country; carries the readable message and where it is available.
     case geoBlocked(String, [String])
 
@@ -16,6 +18,7 @@ enum EngineError: LocalizedError {
         switch self {
         case .badResponse(let name): "Couldn't download \(name). Check your connection and try again."
         case .unpackFailed(let name): "Couldn't unpack \(name)."
+        case .untrusted(let name): "The downloaded \(name) isn't signed by its publisher, so Reel didn't install it. Try again later, and report it if this keeps happening."
         case .missingBinary(let name): "\(name) wasn't found in the downloaded package."
         case .notReady: "Reel is still getting ready."
         case .lookupFailed(let message): message
@@ -65,6 +68,17 @@ enum Component: String, CaseIterable, Identifiable {
         case .deno: "deno"
         case .uv: "uv"
         case .gallerydl: "gallery-dl"
+        }
+    }
+
+    /// The Apple Developer team that signs the downloaded tool. A download not signed by
+    /// this team is refused, so a tampered or substituted file never runs.
+    var signingTeam: String? {
+        switch self {
+        case .ffmpeg, .ffprobe: "KU3N25YGLU"   // Martin Riedl
+        case .deno: "2H4KBF436B"               // Deno Land Inc.
+        case .uv: "2DC432GLL2"                 // OpenAI OpCo, LLC (Astral)
+        case .ytdlp, .gallerydl: nil           // installed from PyPI by uv
         }
     }
 
@@ -244,6 +258,10 @@ final class Engine {
         }
         defer { if let unpackDir { try? fm.removeItem(at: unpackDir) } }
 
+        if let team = component.signingTeam {
+            guard await Self.isSigned(binary, byTeam: team) else { throw EngineError.untrusted(component.displayName) }
+        }
+
         // Swap in atomically so a running download never sees a half-written file.
         let staged = binDir.appendingPathComponent(".\(component.fileName).new")
         try? fm.removeItem(at: staged)
@@ -255,6 +273,16 @@ final class Engine {
         } else {
             try fm.moveItem(at: staged, to: destination)
         }
+    }
+
+    /// Whether `file` carries a valid Developer ID signature from `team`.
+    static func isSigned(_ file: URL, byTeam team: String) async -> Bool {
+        guard team.allSatisfy({ $0.isLetter || $0.isNumber }) else { return false }
+        let requirement = "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+            + " and certificate leaf[subject.OU] = \"\(team)\""
+        let result = try? await Shell.run(URL(fileURLWithPath: "/usr/bin/codesign"),
+                                          ["--verify", "--strict", "-R=" + requirement, file.path])
+        return result?.status == 0
     }
 
     /// Creates (or upgrades) gallery-dl in its own Python environment. yt-dlp is installed
