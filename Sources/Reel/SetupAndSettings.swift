@@ -95,6 +95,8 @@ struct SettingsView: View {
         }
         .frame(width: 500)
         .scenePadding()
+        .deskBackground()
+        .clearToolbar()
     }
 }
 
@@ -176,6 +178,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private func chooseFolder() {
@@ -309,6 +312,7 @@ private struct DownloadSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 }
 
@@ -376,6 +380,7 @@ private struct AccountSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 }
 
@@ -418,6 +423,7 @@ private struct SupportSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 }
 
@@ -476,6 +482,7 @@ private struct EngineSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .task { await engine.refreshVersions() }
     }
 }

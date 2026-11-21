@@ -81,6 +81,8 @@ final class MenuBarController: NSObject, NSWindowDelegate, NSDraggingDestination
         container.layer?.masksToBounds = true
         let glass = NSGlassEffectView(frame: container.bounds)
         glass.cornerRadius = MenuPanel.cornerRadius
+        // Glass tinted with the canvas, like the main window's sheets.
+        glass.tintColor = Look.Colors.platformCanvas(opacity: 0.5)
         glass.autoresizingMask = [.width, .height]
         hosting.frame = container.bounds
         hosting.autoresizingMask = [.width, .height]
@@ -280,9 +282,9 @@ struct MenuPanel: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Look.Spacing.md) {
             HStack {
-                Text("Reel").font(.headline)
+                Text("Reel").font(Look.Typography.headline)
                 Spacer()
                 Button {
                     MenuBarController.shared.hidePanel()
@@ -302,7 +304,7 @@ struct MenuPanel: View {
             }
             .buttonStyle(.borderless)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Look.Spacing.sm) {
                 Image(systemName: "link").foregroundStyle(.secondary)
                 TextField("Paste a link to download", text: $link)
                     .textFieldStyle(.plain)
@@ -317,9 +319,9 @@ struct MenuPanel: View {
                 .foregroundStyle(.tint)
                 .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .padding(.horizontal, Look.Spacing.md)
+            .padding(.vertical, Look.Spacing.sm)
+            .quietCard()
 
             if clipboardHasLink, link.isEmpty {
                 Button {
@@ -330,7 +332,7 @@ struct MenuPanel: View {
                 } label: {
                     Label("Download Copied Link", systemImage: "doc.on.clipboard")
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.quietChip)
             }
 
             if case .installing = engine.phase {
@@ -362,8 +364,6 @@ struct MenuPanel: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
-            Divider()
-
             HStack {
                 Text(summary)
                     .font(.caption)
@@ -387,7 +387,7 @@ struct MenuPanel: View {
             .buttonStyle(.borderless)
             .font(.callout)
         }
-        .padding(14)
+        .padding(Look.Spacing.lg)
         .frame(width: 370)
         .overlay {
             if dropTargeted {
@@ -445,7 +445,7 @@ struct MiniRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Look.Spacing.sm) {
             Thumbnail(url: job.thumbnail, width: 60, placeholder: job.kind == .gallery ? "photo" : "play.rectangle")
             VStack(alignment: .leading, spacing: 3) {
                 Text(job.title)
@@ -467,8 +467,9 @@ struct MiniRow: View {
             JobControls(job: job, size: .title3)
         }
         .padding(.vertical, 5)
-        .padding(.horizontal, 6)
-        .background(hovering ? AnyShapeStyle(.fill.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8))
+        .padding(.horizontal, Look.Spacing.sm)
+        .background(hovering ? Look.Colors.chipFill : .clear,
+                    in: RoundedRectangle(cornerRadius: Look.Radius.chip, style: .continuous))
         .contentShape(.rect)
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { job.open() }
