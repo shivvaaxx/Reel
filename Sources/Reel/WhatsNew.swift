@@ -192,10 +192,10 @@ struct WhatsNewView: View {
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 18)
-            .background(.bar)
+            .padding(.horizontal, Look.Spacing.xl + Look.Spacing.xs)
+            .padding(.vertical, Look.Spacing.lg)
         }
         .frame(width: 500, height: 600)
+        .deskBackground()
     }
 }

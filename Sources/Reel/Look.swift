@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Reel's look: one matte canvas, glass sheets floating on it, quiet tiles inside them.
@@ -9,6 +10,14 @@ enum Look {
             dark ? Color(.sRGB, red: 0.11, green: 0.10, blue: 0.09) : Color(.sRGB, red: 0.96, green: 0.94, blue: 0.90)
         }
         static func glassTint(dark: Bool) -> Color { canvas(dark: dark).opacity(0.5) }
+        /// The canvas as an AppKit colour that follows the system appearance, at the given opacity.
+        static func platformCanvas(opacity: CGFloat = 1) -> NSColor {
+            NSColor(name: nil) { appearance in
+                let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                return dark ? NSColor(srgbRed: 0.11, green: 0.10, blue: 0.09, alpha: opacity)
+                            : NSColor(srgbRed: 0.96, green: 0.94, blue: 0.90, alpha: opacity)
+            }
+        }
         static func glassBase(dark: Bool) -> Color { canvas(dark: dark).opacity(0.6) }
 
         /// Tile edge only; never a divider inside a sheet.
