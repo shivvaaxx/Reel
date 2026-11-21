@@ -330,7 +330,9 @@ struct HandoffTests {
         "http://127.0.0.1/", "http://127.1/", "http://2130706433/", "http://0x7f.0.0.1/", "http://0177.0.0.1/",
         "http://10.0.0.1/", "http://172.16.5.4/", "http://192.168.1.1/admin", "http://169.254.169.254/latest",
         "http://100.64.0.1/", "http://0.0.0.0/", "http://[::1]/", "http://[fe80::1]/", "http://[fd00::1]/",
-        "http://[::ffff:127.0.0.1]/", "ftp://example.com/", "file:///etc/passwd",
+        "http://[::ffff:127.0.0.1]/", "http://[::ffff:7f00:1]/", "http://[::127.0.0.1]/", "http://[::]/",
+        "http://[fec0::1]/", "http://[64:ff9b::7f00:1]/", "http://[64:ff9b::c0a8:101]/", "http://[ff02::1]/",
+        "http://router/", "http://nas:5000/", "ftp://example.com/", "file:///etc/passwd",
     ])
     func refused(_ link: String) {
         #expect(!Handoff.isPublicWebLink(link))
@@ -338,7 +340,7 @@ struct HandoffTests {
 
     @Test("Public links still work", arguments: [
         "https://www.youtube.com/watch?v=x", "https://youtu.be/x", "http://172.32.0.1/", "https://8.8.8.8/",
-        "https://[2606:4700::1111]/", "https://vimeo.com/123",
+        "https://[2606:4700::1111]/", "https://vimeo.com/123", "https://[::ffff:8.8.8.8]/", "https://[64:ff9b::808:808]/",
     ])
     func allowed(_ link: String) {
         #expect(Handoff.isPublicWebLink(link))
