@@ -4,6 +4,13 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+### Changed
+- **A fresh look.** The window is one calm, matte surface (cream in light mode, charcoal in dark) with the link field, video cards and lists floating on it as glass panels. The Library's site filter is now a row of buttons, and row actions are quieter.
+- **A new app icon** to match: a cream tile with a charcoal download arrow, switching to charcoal with a cream arrow in dark mode.
+
+### Fixed
+- Downloading a video you already have at another quality now saves a second copy, named by quality (for example "Title (4K)"), instead of being skipped as already downloaded.
+
 ## [1.3.0] - 2026-11-04
 
 ### Added
