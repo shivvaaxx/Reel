@@ -21,11 +21,9 @@ func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
             blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
 }
 
-// Deep indigo background with a soft glow of the icon's colours behind it.
-NSGradient(colors: [color(0x120E2E), color(0x1E1650), color(0x2A1440)])!
-    .draw(in: NSRect(origin: .zero, size: size), angle: -20)
-NSGradient(colors: [color(0xD449D7, 0.55), color(0x8044ED, 0.25), color(0x8044ED, 0)])!
-    .draw(fromCenter: NSPoint(x: 330, y: 320), radius: 0, toCenter: NSPoint(x: 330, y: 320), radius: 420, options: [])
+// The app's matte charcoal canvas; the cream icon stands out on it.
+color(0x1C1A17).setFill()
+NSRect(origin: .zero, size: size).fill()
 
 // Icon.
 icon.draw(in: NSRect(x: 110, y: 120, width: 400, height: 400))
@@ -33,7 +31,7 @@ icon.draw(in: NSRect(x: 110, y: 120, width: 400, height: 400))
 // Name and tagline.
 let title = NSAttributedString(string: "Reel", attributes: [
     .font: NSFont.systemFont(ofSize: 132, weight: .bold),
-    .foregroundColor: NSColor.white,
+    .foregroundColor: color(0xF5F0E6),
     .kern: -2,
 ])
 title.draw(at: NSPoint(x: 560, y: 330))
@@ -44,14 +42,14 @@ let tagline = NSAttributedString(
     string: "A clean, native Mac app for downloading videos and photos from YouTube, Instagram, TikTok and a thousand other sites.",
     attributes: [
         .font: NSFont.systemFont(ofSize: 34, weight: .regular),
-        .foregroundColor: NSColor(white: 1, alpha: 0.78),
+        .foregroundColor: color(0xF5F0E6, 0.72),
         .paragraphStyle: paragraph,
     ])
 tagline.draw(in: NSRect(x: 564, y: 150, width: 640, height: 170))
 
 let footer = NSAttributedString(string: "Free and open source  ·  macOS 26", attributes: [
     .font: NSFont.systemFont(ofSize: 24, weight: .medium),
-    .foregroundColor: color(0xFC7989),
+    .foregroundColor: color(0xF5F0E6, 0.5),
 ])
 footer.draw(at: NSPoint(x: 564, y: 104))
 
