@@ -22,7 +22,7 @@ struct EngineSetupView: View {
                     .frame(maxWidth: 360)
             }
 
-            VStack(spacing: 0) {
+            VStack(spacing: Look.Spacing.xs) {
                 ForEach(engine.installQueue) { component in
                     HStack(spacing: 12) {
                         statusIcon(for: component)
@@ -40,11 +40,11 @@ struct EngineSetupView: View {
                     }
                     .padding(.vertical, 9)
                     .padding(.horizontal, 14)
-                    if component != engine.installQueue.last { Divider().padding(.leading, 46) }
                 }
             }
             .frame(width: 380)
-            .background(.fill.quinary, in: .rect(cornerRadius: 14))
+            .padding(.vertical, Look.Spacing.xs)
+            .quietCard()
 
             if isFailed {
                 Button("Try Again") {
@@ -54,7 +54,8 @@ struct EngineSetupView: View {
                 .controlSize(.large)
             }
         }
-        .padding(40)
+        .padding(Look.Spacing.canvas + Look.Spacing.lg)
+        .glassSheet()
     }
 
     private var isFailed: Bool { engine.phase.isFailure }

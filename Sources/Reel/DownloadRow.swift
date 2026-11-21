@@ -8,7 +8,7 @@ struct DownloadRow: View {
     @State private var showingCountries = false
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Look.Spacing.md) {
             Thumbnail(url: job.thumbnail, width: 104, placeholder: job.kind == .gallery ? "photo.on.rectangle" : "play.rectangle")
                 .overlay {
                     if job.status == .finished && job.kind == .video {
@@ -22,7 +22,7 @@ struct DownloadRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(job.title)
-                    .font(.body.weight(.medium))
+                    .font(Look.Typography.label)
                     .lineLimit(1)
 
                 if job.showsProgressBar {
@@ -51,7 +51,7 @@ struct DownloadRow: View {
 
             JobControls(job: job, size: .title2)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, Look.Spacing.xs)
         .contentShape(.rect)
         .onTapGesture(count: 2) { job.open() }
         .contextMenu { JobMenu(job: job, showingLog: $showingLog) }
