@@ -129,11 +129,11 @@ Everything lives in `~/Library/Application Support/Reel/`. Delete that folder an
 
 1. Download the `.dmg` from the [latest release](../../releases/latest).
 2. Open it and drag **Reel** into **Applications**.
-3. Open Reel. The first time, macOS will say it can't verify the developer, because Reel isn't notarized by Apple yet. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once; after that, Reel updates itself.
+3. Open Reel. Reel is signed with a Developer ID and notarized by Apple, but macOS may still ask you to confirm opening an app downloaded from the internet; click **Open**. You only need to do this once; after that, Reel updates itself.
 4. Reel takes a few seconds to download its tools, and then it's ready.
 
 **Optional extras:**
-- **Safari extension:** turn on Reel in **Safari › Settings › Extensions**. Because Reel isn't notarized yet, you may first need to enable **Develop › Allow Unsigned Extensions**.
+- **Safari extension:** turn on Reel in **Safari › Settings › Extensions**.
 - **Share menu:** if Reel isn't listed, turn it on in **System Settings › General › Login Items & Extensions › Sharing**.
 
 ## Scripting
