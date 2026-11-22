@@ -7,6 +7,15 @@
     <language>en</language>
     <!-- release.sh adds new versions below this line -->
     <item>
+      <title>Reel 1.4.1</title>
+      <pubDate>Sun, 22 Nov 2026 19:57:00 +0800</pubDate>
+      <sparkle:version>47</sparkle:version>
+      <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<h3>Security</h3><ul><li>Reel now installs FFmpeg, Deno and uv only if they&#x27;re signed by their publishers, so a tampered download is refused instead of run.</li><li>Links sent through <code>reel://</code> (from web pages, the bookmarklet or scripts) are refused when they name this Mac or a local network directly: <code>localhost</code>, private and link-local addresses (IPv4 and IPv6, including disguised forms like <code>0x7f.1</code>), single-word hosts like <code>router</code>, and names ending in <code>.local</code>, <code>.lan</code> or <code>.internal</code>. A public name that resolves to a local address, or a redirect, is not caught.</li></ul><h3>Changed</h3><ul><li>The menu bar panel, What&#x27;s New and Settings now match the new look: the same cream or charcoal canvas, with quieter controls.</li></ul>]]></description>
+      <enclosure url="https://github.com/shivvaaxx/Reel/releases/download/v1.4.1/Reel-1.4.1.dmg" sparkle:edSignature="v0BtPpc8oRPDOa6HHL0jx2oTaEd7aHHAmB239UziBKuz5QQEUDohXs1FflZzCR13f/xSSxxVhHizzmyCpWz2Ag==" length="4285887" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Reel 1.4.0</title>
       <pubDate>Sat, 21 Nov 2026 13:00:25 +0800</pubDate>
       <sparkle:version>34</sparkle:version>

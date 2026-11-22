@@ -4,6 +4,8 @@ All notable changes to Reel. Versions follow [semantic versioning](https://semve
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-22
+
 ### Security
 - Reel now installs FFmpeg, Deno and uv only if they're signed by their publishers, so a tampered download is refused instead of run.
 - Links sent through `reel://` (from web pages, the bookmarklet or scripts) are refused when they name this Mac or a local network directly: `localhost`, private and link-local addresses (IPv4 and IPv6, including disguised forms like `0x7f.1`), single-word hosts like `router`, and names ending in `.local`, `.lan` or `.internal`. A public name that resolves to a local address, or a redirect, is not caught.
